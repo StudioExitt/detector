@@ -1,0 +1,88 @@
+[common]
+# 지정하지 않으면 8088
+apiPort = 9009
+# debug | info | warn | error (지정하지 않으면 info)
+logLevel = "debug"
+# 지정하지 않으면 로컬 타임존
+timeZone = "Asia/Seoul"
+
+[log]
+# 로그 파일은 <dir>/<prefix>-YYYY-MM-DD.log 형식으로 일자별 생성
+dir = "logs"
+prefix = "detector"
+# true 이면 표준출력에도 함께 기록
+stdout = true
+
+[database]
+dbType = "sqlite3"
+filePath = "detector.db"
+
+# ── 침입 탐지 ──────────────────────────────────────────────
+# OS 에 맞는 수집 방식이 자동 선택됨 (macOS: unified log/dscl/netstat, Linux: auth.log/journald//proc)
+# 정확한 탐지를 위해 root 로 실행 권장 (일반 사용자로 실행 시 일부 파일/프로세스 정보가 제한됨)
+[detect]
+enabled = true
+cooldown = "1h"            # 같은 탐지 결과의 재등록 억제 시간
+metricsRetention = "168h"  # CPU/메모리/네트워크 시계열 보관 기간
+
+[detect.auth]              # SSH/sudo/로컬 비밀번호 실패, 무차별 대입, 실패 후 성공
+interval = "30s"
+failThreshold = 5          # failWindow 안에 이 횟수 이상 실패하면 무차별 대입으로 판단
+failWindow = "5m"
+# logFiles = ["/var/log/auth.log", "/var/log/secure"]   # Linux 전용, 없으면 journald 사용
+
+[detect.fim]               # 주요 설정/자동실행/SSH 키 파일 변경 감시
+interval = "5m"
+# extraPaths = ["/opt/app/config"]
+
+[detect.listeners]         # 새로 열린 LISTEN 포트
+interval = "1m"
+# ignorePorts = [5173]
+
+[detect.process]           # 임시 경로 실행, 채굴기, 리버스 셸, 삭제된 실행파일
+interval = "1m"
+
+[detect.accounts]          # 계정 추가, 관리자 그룹 변경, UID 0, 빈 비밀번호
+interval = "5m"
+
+[detect.posture]           # 보안 설정 (macOS: SIP/Gatekeeper/방화벽/FileVault…, Linux: sshd/ASLR/LSM)
+interval = "10m"
+
+# 시스템 자원: CPU/메모리/디스크 이상징후 (웹 "시스템 상태")
+[detect.resources]
+interval = "30s"
+procCpuPercent = 80       # 프로세스 CPU (100 = 코어 1개) 가 sustain 동안 지속되면 탐지
+systemCpuPercent = 90     # 시스템 전체 CPU
+sustain = "5m"
+procMemPercent = 25       # 단일 프로세스가 RAM 의 이 비율 이상 점유
+diskWarnPercent = 90
+diskCritPercent = 95
+diskGrowthGB = 5          # 10분 내 증가량
+# ignoreProcesses = ["java"]   # macOS 는 SIP 보호 경로(/System, /usr/libexec ...) 프로세스를 자동 제외
+
+# 네트워크: 연결 상태 + 외부 접속 이상징후 (웹 "네트워크 점검")
+[detect.network]
+interval = "30s"
+probeTargets = ["1.1.1.1:443", "8.8.8.8:443"]   # 인터넷 연결 확인 (빈 배열이면 점검 안 함)
+maxConnsPerProcess = 200
+maxRemoteHosts = 100      # 한 프로세스가 동시에 연결한 외부 호스트 수 (스캔/봇넷)
+uploadMB = 500            # 10분간 프로세스별 업로드량 (macOS)
+# suspiciousPorts = [4444, 6667, 9050, 3333, ...]   # 기본값: 백도어·IRC·Tor·채굴 풀 포트
+
+# ── macOS 전용 ─────────────────────────────────────────────
+# 클립보드 감시: 지갑 주소 바꿔치기(clipper) 탐지. 로그인 사용자 권한으로 실행해야 함 (root 데몬 X)
+# 지갑 주소 형식의 값만 메모리에서 비교하며, 그 외 클립보드 내용은 저장/로그하지 않음
+[detect.clipboard]
+interval = "10s"           # 상태/탐지 결과 수집 주기
+pollInterval = "50ms"      # 클립보드 변경 확인 간격
+swapWindow = "1s"          # 주소 A 가 이 시간 안에 같은 체인의 다른 주소로 바뀌면 바꿔치기로 판단
+canaryWait = "1.5s"        # 카나리아 테스트에서 미끼 주소 1개당 대기 시간
+
+# 브라우저 확장: Chrome 계열 + Firefox 의 악성 확장 감시
+#  - Chrome 판정(Safe Browsing 차단, 웹스토어 위반/게시중단, 파일 변조) / 설치 경로(압축해제, --load-extension, 사이드로드, 정책)
+#  - 코드 패턴(키로거, 쿠키 탈취, 원격 코드 실행, 지갑 탈취, 클리퍼) / 업데이트 후 권한 확대(공급망 공격)
+[detect.extensions]
+interval = "10m"
+# trustedIds = ["nkbihfbeogaeaoehlefnkodbefgpgknn"]   # 검토 완료한 확장 (알림 제외)
+# blockedIds = []                                    # 설치 시 항상 critical
+# blocklistFile = "/etc/detector/blocked-extensions.txt"   # 한 줄에 ID 하나

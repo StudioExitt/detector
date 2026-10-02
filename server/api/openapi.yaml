@@ -1,0 +1,622 @@
+openapi: 3.0.3
+info:
+  title: Detector API
+  description: 해킹, 비정상 시스템 점유, 취약점 점검 등을 감시하는 Detector 서버 API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+tags:
+  - name: system
+  - name: events
+  - name: detectors
+paths:
+  /detectors:
+    get:
+      tags: [detectors]
+      operationId: listDetectors
+      summary: 탐지기 동작 상태 조회
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectorList"
+  /detectors/{name}:
+    parameters:
+      - $ref: "#/components/parameters/DetectorName"
+    get:
+      tags: [detectors]
+      operationId: getDetector
+      summary: 탐지기 상세 (현재 상태, 데이터 소스)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectorDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /detectors/{name}/runs:
+    parameters:
+      - $ref: "#/components/parameters/DetectorName"
+    get:
+      tags: [detectors]
+      operationId: listDetectorRuns
+      summary: 탐지기 실행 이력 (최신순)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectorRunList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /detectors/{name}/runs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/DetectorName"
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    get:
+      tags: [detectors]
+      operationId: getDetectorRun
+      summary: 실행 1건의 상세 (당시 점검 항목 포함)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectorRun"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /clipboard/test:
+    post:
+      tags: [detectors]
+      operationId: runClipboardTest
+      summary: 클립보드 카나리아 테스트 (macOS)
+      description: |
+        미끼 지갑 주소(공개 주소)를 차례로 클립보드에 넣고 다른 프로그램이 바꾸는지 확인한 뒤
+        원래 클립보드 내용(모든 형식)을 복원합니다. 약 8초간 클립보드가 바뀝니다.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClipboardTestResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /system/status:
+    get:
+      tags: [system]
+      operationId: getSystemStatus
+      summary: 현재 CPU/메모리/디스크/상위 프로세스
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /network/status:
+    get:
+      tags: [system]
+      operationId: getNetworkStatus
+      summary: 현재 네트워크 연결 상태와 외부 접속
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /metrics:
+    get:
+      tags: [system]
+      operationId: getMetrics
+      summary: 시계열 지표 (cpu.usage, mem.used_pct, net.rx_bps ...)
+      parameters:
+        - name: names
+          in: query
+          required: true
+          description: 쉼표로 구분한 지표 이름
+          schema:
+            type: string
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 7d]
+            default: 1h
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricSeriesList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: 서버 상태 확인
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /events:
+    get:
+      tags: [events]
+      operationId: listEvents
+      summary: 탐지 이벤트 목록 조회
+      parameters:
+        - name: category
+          in: query
+          schema:
+            $ref: "#/components/schemas/EventCategory"
+        - name: detector
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [events]
+      operationId: createEvent
+      summary: 탐지 이벤트 등록
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewEvent"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+components:
+  parameters:
+    DetectorName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Health:
+      type: object
+      required: [status, version, time]
+      properties:
+        status:
+          type: string
+          example: ok
+        version:
+          type: string
+        time:
+          type: string
+          format: date-time
+    EventCategory:
+      type: string
+      enum: [intrusion, resource_abuse, vulnerability_scan, etc]
+    EventSeverity:
+      type: string
+      enum: [low, medium, high, critical]
+    NewEvent:
+      type: object
+      required: [category, severity, message]
+      properties:
+        category:
+          $ref: "#/components/schemas/EventCategory"
+        severity:
+          $ref: "#/components/schemas/EventSeverity"
+        source:
+          type: string
+          description: 탐지 대상 (호스트, IP 등)
+        message:
+          type: string
+        detectedAt:
+          type: string
+          format: date-time
+          description: 생략 시 서버 수신 시각
+        detector:
+          type: string
+          description: 이벤트를 생성한 탐지기 (외부 등록 시 생략 가능)
+        rule:
+          type: string
+          description: 탐지 규칙 ID (예 auth.ssh_bruteforce)
+    Event:
+      allOf:
+        - $ref: "#/components/schemas/NewEvent"
+        - type: object
+          required: [id, detectedAt]
+          properties:
+            id:
+              type: integer
+              format: int64
+    EventList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        total:
+          type: integer
+          format: int64
+    DetectorCheck:
+      type: object
+      required: [name, status, detail]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ok, warn, fail]
+        detail:
+          type: string
+    DetectorStatus:
+      type: object
+      required: [name, intervalSeconds, findings, summary, checks]
+      properties:
+        name:
+          type: string
+        intervalSeconds:
+          type: integer
+        lastRunAt:
+          type: string
+          format: date-time
+        lastDurationMs:
+          type: integer
+          format: int64
+        lastError:
+          type: string
+        findings:
+          type: integer
+          format: int64
+          description: 서버 기동 이후 저장된 탐지 건수
+        summary:
+          type: string
+        compactSuccessRuns:
+          type: boolean
+          description: true 이면 정상 실행은 마지막 1건만 보관하고, 탐지/오류가 있는 실행은 모두 이력에 기록
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DetectorCheck"
+    DetectorList:
+      type: object
+      required: [platform, host, items]
+      properties:
+        platform:
+          type: string
+          example: darwin/arm64
+        host:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DetectorStatus"
+    DetectorDetail:
+      type: object
+      required: [platform, host, status, sources]
+      properties:
+        platform:
+          type: string
+        host:
+          type: string
+        status:
+          $ref: "#/components/schemas/DetectorStatus"
+        sources:
+          type: array
+          description: 이 플랫폼에서 탐지기가 확인하는 데이터
+          items:
+            type: string
+    DetectorRun:
+      type: object
+      required: [id, startedAt, durationMs, summary, findings, checksOk, checksWarn, checksFail]
+      properties:
+        id:
+          type: integer
+          format: int64
+        startedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+          format: int64
+        error:
+          type: string
+        summary:
+          type: string
+        findings:
+          type: integer
+          format: int64
+          description: 이번 실행에서 새로 저장된 이벤트 수
+        checksOk:
+          type: integer
+        checksWarn:
+          type: integer
+        checksFail:
+          type: integer
+        checks:
+          type: array
+          description: 실행 상세 조회 시에만 포함
+          items:
+            $ref: "#/components/schemas/DetectorCheck"
+    DetectorRunList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DetectorRun"
+        total:
+          type: integer
+          format: int64
+    ClipboardCanaryCheck:
+      type: object
+      required: [chain, canary, changed, swapped]
+      properties:
+        chain:
+          type: string
+        canary:
+          type: string
+          description: 미끼로 넣은 주소
+        observed:
+          type: string
+          description: 바뀐 뒤의 값 (바꿔치기면 공격자 주소로 추정)
+        changed:
+          type: boolean
+        swapped:
+          type: boolean
+        afterMs:
+          type: integer
+          format: int64
+    ClipboardTestResult:
+      type: object
+      required: [startedAt, durationMs, swapped, restored, checks]
+      properties:
+        startedAt:
+          type: string
+          format: date-time
+        durationMs:
+          type: integer
+          format: int64
+        swapped:
+          type: boolean
+        restored:
+          type: boolean
+          description: 원래 클립보드 내용 복원 성공 여부
+        note:
+          type: string
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClipboardCanaryCheck"
+    ProcUsage:
+      type: object
+      required: [pid, name, exe, user, cpuPct, rss]
+      properties:
+        pid: {type: integer}
+        name: {type: string}
+        exe: {type: string}
+        user: {type: string}
+        cpuPct: {type: number, format: double, description: "100 = 코어 1개"}
+        rss: {type: integer, format: int64}
+        highSince: {type: string, format: date-time, description: "CPU 고부하가 시작된 시각"}
+    CpuStat:
+      type: object
+      required: [usagePct, userPct, systemPct, load1, load5, load15, cores]
+      properties:
+        usagePct: {type: number, format: double}
+        userPct: {type: number, format: double}
+        systemPct: {type: number, format: double}
+        load1: {type: number, format: double}
+        load5: {type: number, format: double}
+        load15: {type: number, format: double}
+        cores: {type: integer}
+    MemoryStat:
+      type: object
+      required: [total, used, usedPct, pressure, swapTotal, swapUsed]
+      properties:
+        total: {type: integer, format: int64}
+        used: {type: integer, format: int64}
+        usedPct: {type: number, format: double}
+        pressure: {type: string, description: "normal / warn / critical"}
+        swapTotal: {type: integer, format: int64}
+        swapUsed: {type: integer, format: int64}
+    DiskUsage:
+      type: object
+      required: [mount, total, used, free, usedPct]
+      properties:
+        mount: {type: string}
+        total: {type: integer, format: int64}
+        used: {type: integer, format: int64}
+        free: {type: integer, format: int64}
+        usedPct: {type: number, format: double}
+    SystemStatus:
+      type: object
+      required: [at, cpu, memory, disks, topCpu, topMem]
+      properties:
+        at: {type: string, format: date-time}
+        cpu: {$ref: "#/components/schemas/CpuStat"}
+        memory: {$ref: "#/components/schemas/MemoryStat"}
+        disks:
+          type: array
+          items: {$ref: "#/components/schemas/DiskUsage"}
+        topCpu:
+          type: array
+          items: {$ref: "#/components/schemas/ProcUsage"}
+        topMem:
+          type: array
+          items: {$ref: "#/components/schemas/ProcUsage"}
+    InternetProbe:
+      type: object
+      required: [reachable, latencyMs, target]
+      properties:
+        reachable: {type: boolean}
+        latencyMs: {type: number, format: double}
+        target: {type: string}
+        error: {type: string}
+    NetInterface:
+      type: object
+      required: [name, up, addrs, rxBps, txBps]
+      properties:
+        name: {type: string}
+        up: {type: boolean}
+        addrs: {type: array, items: {type: string}}
+        rxBps: {type: number, format: double}
+        txBps: {type: number, format: double}
+    ProcConnections:
+      type: object
+      required: [pid, name, exe, conns, external, hosts, synSent, ports, sample, txBytes, rxBytes, flags]
+      properties:
+        pid: {type: integer}
+        name: {type: string}
+        exe: {type: string}
+        conns: {type: integer}
+        external: {type: integer}
+        hosts: {type: integer}
+        synSent: {type: integer}
+        ports: {type: array, items: {type: integer}}
+        sample: {type: array, items: {type: string}}
+        txBytes: {type: integer, format: int64}
+        rxBytes: {type: integer, format: int64}
+        flags: {type: array, items: {type: string}}
+    NetConnection:
+      type: object
+      required: [local, remote, remotePort, scope, state, pid, process, txBytes, rxBytes]
+      properties:
+        local: {type: string}
+        remote: {type: string}
+        remotePort: {type: integer}
+        scope: {type: string}
+        state: {type: string}
+        pid: {type: integer}
+        process: {type: string}
+        txBytes: {type: integer, format: int64}
+        rxBytes: {type: integer, format: int64}
+    NetworkStatus:
+      type: object
+      required: [at, gateway, gatewayMac, interface, dns, proxies, internet, interfaces, rxBps, txBps, established, external, processes, connections]
+      properties:
+        at: {type: string, format: date-time}
+        gateway: {type: string}
+        gatewayMac: {type: string}
+        interface: {type: string}
+        dns: {type: array, items: {type: string}}
+        proxies: {type: array, items: {type: string}}
+        internet: {$ref: "#/components/schemas/InternetProbe"}
+        interfaces:
+          type: array
+          items: {$ref: "#/components/schemas/NetInterface"}
+        rxBps: {type: number, format: double}
+        txBps: {type: number, format: double}
+        established: {type: integer}
+        external: {type: integer}
+        processes:
+          type: array
+          items: {$ref: "#/components/schemas/ProcConnections"}
+        connections:
+          type: array
+          items: {$ref: "#/components/schemas/NetConnection"}
+    MetricPoint:
+      type: object
+      required: [t, v]
+      properties:
+        t: {type: string, format: date-time}
+        v: {type: number, format: double}
+    MetricSeries:
+      type: object
+      required: [name, points]
+      properties:
+        name: {type: string}
+        points:
+          type: array
+          items: {$ref: "#/components/schemas/MetricPoint"}
+    MetricSeriesList:
+      type: object
+      required: [range, items]
+      properties:
+        range: {type: string}
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/MetricSeries"}
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
