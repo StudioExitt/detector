@@ -1,1 +1,12 @@
 *.sh
+
+# Go server build / runtime output
+build/
+logs/
+*.db
+*.db-wal
+*.db-shm
+
+# web UI copied in for embedding (make web)
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep

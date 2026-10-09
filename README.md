@@ -2,19 +2,37 @@
 
 해킹, 비정상 시스템 점유, 취약점 점검 등을 감시하는 서비스.
 
-| 디렉토리 | 내용 |
+| 경로 | 내용 |
 |---|---|
-| `server/` | Go 1.25 API 서버 (net/http + oapi-codegen, SQLite(modernc, no CGO), slog JSON 로그) |
-| `web/` | React 19 + Vite 7 + TypeScript + Tailwind CSS 4 클라이언트 |
+| `cmd/`, `internal/`, `api/` | Go 1.25 서버 (net/http + oapi-codegen, SQLite(modernc, no CGO), slog JSON 로그) |
+| `config.toml` | 실행 설정 (포트, 로그, DB, 탐지기) |
+| `web/` | React 19 + Vite 7 + TypeScript + Tailwind CSS 4 UI (빌드 결과가 바이너리에 내장됨) |
+| `build/`, `logs/`, `detector.db` | 빌드 결과 / 로그 / DB (git 제외) |
 
-## server
+## 빠른 시작 (단일 바이너리)
+
+웹 UI(React 빌드 결과)가 Go 바이너리에 내장되어 **서버 하나만 실행**하면 됩니다.
 
 ```sh
-cd server
+make build      # web 빌드 → internal/webui/dist 로 복사 → build/detector
+make start      # 빌드 후 실행 + 브라우저 열기 (http://localhost:<apiPort>/detector/)
+make run        # 빌드 후 실행만
+
+# 빌드된 바이너리 직접 실행
+./build/detector -c config.toml -open
+```
+
+- Node.js 는 **빌드할 때만** 필요 (실행에는 불필요). 웹을 다시 빌드하지 않으려면 `make build NOWEB=1`
+- `/` → `/detector/` 로 이동, API `/api/v1`, Swagger `/swagger/`
+- UI 를 고칠 때만 `make dev-web` (Vite 핫 리로드, `/api` 는 `web/.env.development` 의 `VITE_PROXY_TARGET` 서버로 프록시)
+
+## 서버 빌드 / 설정
+
+```sh
 make build-linux-amd64   # build/detector-linux-amd64
 make build-linux-arm64   # build/detector-linux-arm64
 make build-linux         # 둘 다
-make run                 # go run ./cmd/detector -c config.toml
+make run                 # 빌드 후 ./build/detector -c config.toml
 make generate            # api/openapi.yaml → api/api.gen.go
 
 ./build/detector -c config.toml      # 또는 -config config.toml

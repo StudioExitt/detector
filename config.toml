@@ -1,6 +1,6 @@
 [common]
 # 지정하지 않으면 8088
-apiPort = 9009
+apiPort = 80
 # debug | info | warn | error (지정하지 않으면 info)
 logLevel = "debug"
 # 지정하지 않으면 로컬 타임존

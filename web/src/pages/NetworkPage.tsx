@@ -94,13 +94,14 @@ export default function NetworkPage() {
               ])}
               format={(v) => rate(v)}
               height={330}
+              minTop={1024}
               stepMs={step}
             />
           )}
         </Card>
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           <Card title={t('net.chart.latency')}>
-            <LineChart series={toChartSeries(metrics.data, [{ name: 'net.latency_ms', label: 'ms', slot: 1 }])} format={(v) => `${v.toFixed(0)}ms`} height={130} stepMs={step} />
+            <LineChart series={toChartSeries(metrics.data, [{ name: 'net.latency_ms', label: 'ms', slot: 1 }])} format={(v) => `${v.toFixed(0)}ms`} height={130} minTop={10} stepMs={step} />
           </Card>
           <Card title={t('net.chart.external')}>
             <LineChart series={toChartSeries(metrics.data, [{ name: 'net.external', label: t('net.connections'), slot: 1 }])} format={(v) => v.toFixed(0)} height={130} stepMs={step} />

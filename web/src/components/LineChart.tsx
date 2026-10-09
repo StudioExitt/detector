@@ -19,21 +19,24 @@ type Props = {
   height?: number
   /** expected gap between points (ms); larger gaps break the line */
   stepMs?: number
+  /** smallest y max when the data is (near) zero, e.g. 1 KB/s */
+  minTop?: number
 }
 
 const PAD = { top: 12, right: 72, bottom: 24, left: 52 }
 
-export default function LineChart({ series, format, yMax, height = 220, stepMs }: Props) {
+export default function LineChart({ series, format, yMax, height = 220, stepMs, minTop = 1 }: Props) {
   const { t, lang } = useI18n()
   const wrapRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(600)
+  // 0 until measured: rendering at a guessed width would stretch grid columns
+  const [width, setWidth] = useState(0)
   const [hover, setHover] = useState<number | null>(null)
   const [showTable, setShowTable] = useState(false)
 
   useLayoutEffect(() => {
     const el = wrapRef.current
     if (!el) return
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(280, e.contentRect.width)))
+    const ro = new ResizeObserver(([e]) => setWidth(Math.max(240, Math.floor(e.contentRect.width))))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -43,7 +46,7 @@ export default function LineChart({ series, format, yMax, height = 220, stepMs }
   const tMin = times[0] ?? 0
   const tMax = times[times.length - 1] ?? 1
   const dataMax = Math.max(0, ...all.map((p) => p.v))
-  const top = yMax ?? niceMax(dataMax)
+  const top = yMax ?? niceMax(Math.max(dataMax, minTop))
   const innerW = width - PAD.left - PAD.right
   const innerH = height - PAD.top - PAD.bottom
   const x = (tt: number) => PAD.left + (tMax === tMin ? innerW / 2 : ((tt - tMin) / (tMax - tMin)) * innerW)
@@ -96,8 +99,8 @@ export default function LineChart({ series, format, yMax, height = 220, stepMs }
         </button>
       </div>
 
-      <div ref={wrapRef} className="relative">
-        {all.length === 0 ? (
+      <div ref={wrapRef} className="relative w-full min-w-0" style={{ minHeight: height }}>
+        {width === 0 ? null : all.length === 0 ? (
           <div className="flex items-center justify-center text-sm text-slate-500" style={{ height }}>
             {t('chart.noData')}
           </div>

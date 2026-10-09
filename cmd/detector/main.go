@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"detector/internal/handler"
 	"detector/internal/logger"
 	"detector/internal/server"
+	"detector/internal/webui"
 )
 
 // Set via -ldflags "-X main.version=..."
@@ -35,6 +38,7 @@ func run() error {
 	flag.StringVar(&cfgPath, "config", "", "path to config file (toml)")
 	flag.StringVar(&cfgPath, "c", "", "path to config file (shorthand for -config)")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	openBrowser := flag.Bool("open", false, "open the web UI in the default browser after start")
 	flag.Parse()
 
 	if *showVersion {
@@ -104,6 +108,17 @@ func run() error {
 		close(errCh)
 	}()
 
+	uiURL := fmt.Sprintf("http://localhost:%d%s", cfg.Common.APIPort, server.WebPrefix)
+	if webui.Built() {
+		log.Info("web UI ready", "url", uiURL)
+		fmt.Fprintln(os.Stderr, "Detector UI:", uiURL)
+		if *openBrowser {
+			go openURL(uiURL)
+		}
+	} else {
+		log.Warn("web UI not embedded in this build; run `make build`", "api", fmt.Sprintf("http://localhost:%d/swagger/", cfg.Common.APIPort))
+	}
+
 	select {
 	case err := <-errCh:
 		if err != nil {
@@ -128,4 +143,18 @@ func run() error {
 	}
 	log.Info("server stopped")
 	return nil
+}
+
+func openURL(u string) {
+	time.Sleep(300 * time.Millisecond) // let the listener come up
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", u)
+	case "linux":
+		cmd = exec.Command("xdg-open", u)
+	default:
+		return
+	}
+	_ = cmd.Start()
 }

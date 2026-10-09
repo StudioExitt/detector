@@ -8,11 +8,14 @@ import (
 
 	"detector/api"
 	"detector/internal/swagger"
+	"detector/internal/webui"
 )
 
 const (
 	APIBaseURL    = "/api/v1"
 	SwaggerPrefix = "/swagger/"
+	// must match VITE_APP_BASE_URL in web/.env.production
+	WebPrefix = "/detector/"
 )
 
 // NewHandler wires the generated API routes, Swagger UI and middleware.
@@ -40,6 +43,10 @@ func NewHandler(ssi api.StrictServerInterface, log *slog.Logger) http.Handler {
 
 	mux.Handle(SwaggerPrefix, swagger.Handler(SwaggerPrefix, api.Spec))
 	mux.Handle("GET /swagger", http.RedirectHandler(SwaggerPrefix, http.StatusMovedPermanently))
+
+	mux.Handle(WebPrefix, webui.Handler(WebPrefix))
+	mux.Handle("GET /detector", http.RedirectHandler(WebPrefix, http.StatusFound))
+	mux.Handle("GET /{$}", http.RedirectHandler(WebPrefix, http.StatusFound))
 
 	return recoverer(log, accessLog(log, mux))
 }
