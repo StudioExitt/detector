@@ -519,6 +519,9 @@ type ServerInterface interface {
 	// CreateEvent 탐지 이벤트 등록
 	// (POST /events)
 	CreateEvent(w http.ResponseWriter, r *http.Request)
+	// OpenFirewallSettings 방화벽 설정 화면 열기 (macOS, 서버가 실행 중인 Mac 에서 열림)
+	// (POST /firewall/open)
+	OpenFirewallSettings(w http.ResponseWriter, r *http.Request)
 	// GetFirewallStatus 방화벽 실행 여부와 설정 내역 (조회 시점에 수집)
 	// (GET /firewall/status)
 	GetFirewallStatus(w http.ResponseWriter, r *http.Request)
@@ -775,6 +778,20 @@ func (siw *ServerInterfaceWrapper) CreateEvent(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// OpenFirewallSettings operation middleware
+func (siw *ServerInterfaceWrapper) OpenFirewallSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpenFirewallSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetFirewallStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetFirewallStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -1005,6 +1022,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/system/status", wrapper.GetSystemStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/network/status", wrapper.GetNetworkStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/firewall/status", wrapper.GetFirewallStatus)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/firewall/open", wrapper.OpenFirewallSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics", wrapper.GetMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
@@ -1269,6 +1287,35 @@ func (response CreateEvent400JSONResponse) VisitCreateEventResponse(w http.Respo
 	return err
 }
 
+type OpenFirewallSettingsRequestObject struct {
+}
+
+type OpenFirewallSettingsResponseObject interface {
+	VisitOpenFirewallSettingsResponse(w http.ResponseWriter) error
+}
+
+type OpenFirewallSettings204Response struct {
+}
+
+func (response OpenFirewallSettings204Response) VisitOpenFirewallSettingsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type OpenFirewallSettings404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response OpenFirewallSettings404JSONResponse) VisitOpenFirewallSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetFirewallStatusRequestObject struct {
 }
 
@@ -1440,6 +1487,9 @@ type StrictServerInterface interface {
 	// CreateEvent 탐지 이벤트 등록
 	// (POST /events)
 	CreateEvent(ctx context.Context, request CreateEventRequestObject) (CreateEventResponseObject, error)
+	// OpenFirewallSettings 방화벽 설정 화면 열기 (macOS, 서버가 실행 중인 Mac 에서 열림)
+	// (POST /firewall/open)
+	OpenFirewallSettings(ctx context.Context, request OpenFirewallSettingsRequestObject) (OpenFirewallSettingsResponseObject, error)
 	// GetFirewallStatus 방화벽 실행 여부와 설정 내역 (조회 시점에 수집)
 	// (GET /firewall/status)
 	GetFirewallStatus(ctx context.Context, request GetFirewallStatusRequestObject) (GetFirewallStatusResponseObject, error)
@@ -1674,6 +1724,30 @@ func (sh *strictHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateEventResponseObject); ok {
 		if err := validResponse.VisitCreateEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// OpenFirewallSettings operation middleware
+func (sh *strictHandler) OpenFirewallSettings(w http.ResponseWriter, r *http.Request) {
+	var request OpenFirewallSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OpenFirewallSettings(ctx, request.(OpenFirewallSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OpenFirewallSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OpenFirewallSettingsResponseObject); ok {
+		if err := validResponse.VisitOpenFirewallSettingsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

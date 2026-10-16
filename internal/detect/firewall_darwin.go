@@ -2,6 +2,7 @@ package detect
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -30,6 +31,20 @@ func collectFirewall(ctx context.Context) ([]FirewallComponent, error) {
 	comps := []FirewallComponent{alfComponent(ctx), pfComponent(ctx)}
 	comps = append(comps, networkExtensions(ctx)...)
 	return comps, nil
+}
+
+// OpenFirewallSettings opens System Settings > Network > Firewall
+// (macOS 13+; older versions use the Security & Privacy pane).
+func OpenFirewallSettings(ctx context.Context) error {
+	for _, u := range []string{
+		"x-apple.systempreferences:com.apple.Network-Settings.extension?Firewall",
+		"x-apple.systempreferences:com.apple.preference.security?Firewall",
+	} {
+		if _, err := runCmdCombined(ctx, 10*time.Second, "open", u); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("open firewall settings failed")
 }
 
 // alfComponent: the macOS application firewall (System Settings > Network > Firewall).

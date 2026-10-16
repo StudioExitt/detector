@@ -153,6 +153,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(res.status, msg)
   }
+  if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
@@ -172,6 +173,7 @@ export const api = {
   systemStatus: (signal?: AbortSignal) => request<SystemStatus>('/system/status', { signal }),
   networkStatus: (signal?: AbortSignal) => request<NetworkStatus>('/network/status', { signal }),
   firewallStatus: (signal?: AbortSignal) => request<FirewallStatus>('/firewall/status', { signal }),
+  openFirewallSettings: () => request<void>('/firewall/open', { method: 'POST' }),
   metrics: (names: string[], range: MetricRange, signal?: AbortSignal) =>
     request<MetricSeriesList>(`/metrics${query({ names: names.join(','), range })}`, { signal }),
   clipboardTest: () => request<ClipboardTestResult>('/clipboard/test', { method: 'POST' }),

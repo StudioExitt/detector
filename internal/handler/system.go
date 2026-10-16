@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -172,4 +173,16 @@ func (h *Handler) GetFirewallStatus(ctx context.Context, _ api.GetFirewallStatus
 		out.Components = append(out.Components, ac)
 	}
 	return out, nil
+}
+
+func (h *Handler) OpenFirewallSettings(ctx context.Context, _ api.OpenFirewallSettingsRequestObject) (api.OpenFirewallSettingsResponseObject, error) {
+	err := detect.OpenFirewallSettings(ctx)
+	if errors.Is(err, detect.ErrUnavailable) {
+		return api.OpenFirewallSettings404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse{
+			Message: "opening firewall settings is supported on macOS only"}}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return api.OpenFirewallSettings204Response{}, nil
 }

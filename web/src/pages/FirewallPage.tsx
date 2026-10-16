@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, ShieldCheck, ShieldOff } from 'lucide-react'
+import { ChevronRight, ExternalLink, ShieldCheck, ShieldOff } from 'lucide-react'
 import StatusIcon from '../components/StatusIcon'
 import { Card, ErrorBox, RefreshButton } from '../components/ui'
 import { useI18n, type MessageKey } from '../i18n'
@@ -14,6 +14,7 @@ export default function FirewallPage() {
   useInterval(reload, 30000)
 
   const enabled = data?.components.filter((c) => c.state === 'on' && c.kind !== 'info') ?? []
+  const isMac = data?.platform.startsWith('darwin') ?? false
 
   return (
     <div className="space-y-4">
@@ -21,7 +22,8 @@ export default function FirewallPage() {
         <span className="text-xs text-slate-500 dark:text-slate-400">
           {data ? t('fw.collectedAt', { time: new Date(data.at).toLocaleTimeString(lang) }) : ''}
         </span>
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-2">
+          {isMac && <OpenSettingsButton />}
           <RefreshButton onClick={reload} loading={loading} />
         </span>
       </div>
@@ -52,6 +54,37 @@ export default function FirewallPage() {
       <h2 className="pt-2 text-sm font-semibold">{t('fw.events')}</h2>
       <EventsPage detector="firewall" />
     </div>
+  )
+}
+
+// Opens System Settings > Network > Firewall on the Mac running the server.
+function OpenSettingsButton() {
+  const { t } = useI18n()
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const open = async () => {
+    try {
+      await api.openFirewallSettings()
+      setMsg({ ok: true, text: t('fw.opened') })
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message })
+    }
+    setTimeout(() => setMsg(null), 4000)
+  }
+  return (
+    <>
+      {msg && (
+        <span className={`text-xs ${msg.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>{msg.text}</span>
+      )}
+      <button
+        type="button"
+        onClick={open}
+        title={t('fw.openHint')}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+      >
+        <ExternalLink className="size-3.5" />
+        {t('fw.open')}
+      </button>
+    </>
   )
 }
 

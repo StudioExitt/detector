@@ -207,6 +207,7 @@ Swagger UI: `http://localhost:<apiPort>/swagger/` — 스펙은 `api/openapi.yam
 | GET | `/api/v1/system/status` | 현재 CPU·메모리·디스크·상위 프로세스 |
 | GET | `/api/v1/network/status` | 현재 네트워크 상태·프로세스별 연결·연결 목록 (LISTEN 제외 TCP, 최대 1000개) |
 | GET | `/api/v1/firewall/status` | 방화벽 동작 여부와 설정 내역 (조회 시점에 수집) |
+| POST | `/api/v1/firewall/open` | 시스템 설정 → 네트워크 → 방화벽 열기 (macOS, 서버가 실행 중인 Mac 에서 열림) |
 | GET | `/api/v1/metrics` | 시계열 지표 (`names=cpu.usage,mem.used_pct,...`, `range=1h\|6h\|24h\|7d`) |
 
 시계열 지표 이름: `cpu.usage`, `cpu.load1`, `mem.used_pct`, `mem.swap_used`, `disk.used_pct`, `net.rx_bps`, `net.tx_bps`, `net.established`, `net.external`, `net.latency_ms`

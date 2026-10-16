@@ -149,6 +149,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FirewallStatus"
+  /firewall/open:
+    post:
+      tags: [system]
+      operationId: openFirewallSettings
+      summary: 방화벽 설정 화면 열기 (macOS, 서버가 실행 중인 Mac 에서 열림)
+      responses:
+        "204":
+          description: 열림
+        "404":
+          $ref: "#/components/responses/NotFound"
   /metrics:
     get:
       tags: [system]

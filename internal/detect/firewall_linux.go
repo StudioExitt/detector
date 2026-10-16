@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// OpenFirewallSettings has no common GUI on Linux.
+func OpenFirewallSettings(context.Context) error { return ErrUnavailable }
+
 func collectFirewall(ctx context.Context) ([]FirewallComponent, error) {
 	var comps []FirewallComponent
 	for _, c := range []FirewallComponent{ufwComponent(ctx), firewalldComponent(ctx), nftComponent(ctx), iptablesComponent(ctx)} {
