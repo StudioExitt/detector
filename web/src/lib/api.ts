@@ -95,6 +95,19 @@ export type NetworkStatus = {
   connections: { local: string; remote: string; remotePort: number; scope: string; state: string; pid: number; process: string; txBytes: number; rxBytes: number }[]
 }
 
+export type FirewallComponent = {
+  id: string
+  name: string
+  kind: 'builtin' | 'third_party' | 'info' | string
+  state: 'on' | 'off' | 'unknown' | 'info' | string
+  detail?: string
+  settings: { name: string; value: string; status: 'ok' | 'warn' | 'fail' | string; note?: string }[]
+  rules: { target: string; action: string; note?: string; warn: boolean }[]
+  files: { path: string; content: string }[]
+}
+
+export type FirewallStatus = { at: string; platform: string; active: boolean; components: FirewallComponent[] }
+
 export type MetricRange = '1h' | '6h' | '24h' | '7d'
 export type MetricSeriesList = { range: string; items: { name: string; points: { t: string; v: number }[] }[] }
 
@@ -158,6 +171,7 @@ export const api = {
     request<DetectorRunList>(`/detectors/${encodeURIComponent(name)}/runs${query(params)}`, { signal }),
   systemStatus: (signal?: AbortSignal) => request<SystemStatus>('/system/status', { signal }),
   networkStatus: (signal?: AbortSignal) => request<NetworkStatus>('/network/status', { signal }),
+  firewallStatus: (signal?: AbortSignal) => request<FirewallStatus>('/firewall/status', { signal }),
   metrics: (names: string[], range: MetricRange, signal?: AbortSignal) =>
     request<MetricSeriesList>(`/metrics${query({ names: names.join(','), range })}`, { signal }),
   clipboardTest: () => request<ClipboardTestResult>('/clipboard/test', { method: 'POST' }),

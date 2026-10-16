@@ -56,6 +56,7 @@ type DetectConfig struct {
 	Process   DetectorConfig        `toml:"process"`
 	Accounts  DetectorConfig        `toml:"accounts"`
 	Posture   DetectorConfig        `toml:"posture"`
+	Firewall  DetectorConfig        `toml:"firewall"`
 	Resources ResourcesDetectConfig `toml:"resources"`
 	Network   NetworkDetectConfig   `toml:"network"`
 	// macOS only
@@ -178,6 +179,7 @@ func (c *Config) applyDefaults() {
 	setInterval(&d.Process, time.Minute)
 	setInterval(&d.Accounts, 5*time.Minute)
 	setInterval(&d.Posture, 10*time.Minute)
+	setInterval(&d.Firewall, time.Minute)
 	setInterval(&d.Resources.DetectorConfig, 30*time.Second)
 	setInterval(&d.Network.DetectorConfig, 30*time.Second)
 	r := &d.Resources
@@ -256,6 +258,7 @@ func (c *Config) validate() error {
 		"process": c.Detect.Process.Interval, "accounts": c.Detect.Accounts.Interval, "posture": c.Detect.Posture.Interval,
 		"clipboard": c.Detect.Clipboard.Interval, "extensions": c.Detect.Extensions.Interval,
 		"resources": c.Detect.Resources.Interval, "network": c.Detect.Network.Interval,
+		"firewall": c.Detect.Firewall.Interval,
 	} {
 		if iv < 5*time.Second {
 			return fmt.Errorf("detect.%s.interval must be >= 5s, got %s", name, iv)

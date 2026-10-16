@@ -27,7 +27,7 @@ type NetworkSnapshot struct {
 	Established int
 	External    int
 	Processes   []ProcConns
-	Connections []NetConn // external connections (capped)
+	Connections []NetConn // all non-listening TCP connections, external first (capped)
 }
 
 type ProbeResult struct {
@@ -77,6 +77,8 @@ type ProcConns struct {
 }
 
 // netRaw is what the platform collector returns.
+const maxListedConns = 1000
+
 type netRaw struct {
 	Gateway, GatewayMAC, Interface string
 	DNS                            []string
@@ -233,6 +235,9 @@ func (d *networkDetector) connectionFindings(env *Env, raw netRaw, snap *Network
 
 	for _, c := range raw.Conns {
 		c.Scope = ipScope(c.RemoteIP)
+		if len(snap.Connections) < maxListedConns {
+			snap.Connections = append(snap.Connections, c)
+		}
 		pk := fmt.Sprintf("%d|%s", c.PID, c.Exe)
 		pc, ok := byProc[pk]
 		if !ok {
@@ -261,9 +266,6 @@ func (d *networkDetector) connectionFindings(env *Env, raw netRaw, snap *Network
 		}
 		if len(pc.Sample) < 3 {
 			pc.Sample = append(pc.Sample, c.Remote)
-		}
-		if len(snap.Connections) < 300 {
-			snap.Connections = append(snap.Connections, c)
 		}
 
 		who := fmt.Sprintf("%s (pid %d) → %s", orNone(c.Process), c.PID, c.Remote)
@@ -358,6 +360,17 @@ func (d *networkDetector) connectionFindings(env *Env, raw netRaw, snap *Network
 			delete(d.uploads, pk)
 		}
 	}
+	scopeRank := map[string]int{"public": 0, "private": 1, "loopback": 2}
+	sort.SliceStable(snap.Connections, func(i, j int) bool {
+		a, b := snap.Connections[i], snap.Connections[j]
+		if scopeRank[a.Scope] != scopeRank[b.Scope] {
+			return scopeRank[a.Scope] < scopeRank[b.Scope]
+		}
+		if (a.State == "ESTABLISHED") != (b.State == "ESTABLISHED") {
+			return a.State == "ESTABLISHED"
+		}
+		return a.Process < b.Process
+	})
 	sort.Slice(snap.Processes, func(i, j int) bool {
 		a, b := snap.Processes[i], snap.Processes[j]
 		if len(a.Flags) != len(b.Flags) {

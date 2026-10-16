@@ -137,6 +137,18 @@ paths:
                 $ref: "#/components/schemas/NetworkStatus"
         "404":
           $ref: "#/components/responses/NotFound"
+  /firewall/status:
+    get:
+      tags: [system]
+      operationId: getFirewallStatus
+      summary: 방화벽 실행 여부와 설정 내역 (조회 시점에 수집)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirewallStatus"
   /metrics:
     get:
       tags: [system]
@@ -591,7 +603,58 @@ components:
           items: {$ref: "#/components/schemas/ProcConnections"}
         connections:
           type: array
+          description: LISTEN 을 제외한 모든 TCP 연결 (외부 → 내부 → 로컬 순, 최대 1000개)
           items: {$ref: "#/components/schemas/NetConnection"}
+    FirewallSetting:
+      type: object
+      required: [name, value, status]
+      properties:
+        name: {type: string}
+        value: {type: string}
+        status: {type: string, description: "ok / warn / fail"}
+        note: {type: string}
+    FirewallRule:
+      type: object
+      required: [target, action, warn]
+      properties:
+        target: {type: string, description: "앱 경로, 포트, 규칙 문장"}
+        action: {type: string, description: "allow / block / rule / active / inactive"}
+        note: {type: string}
+        warn: {type: boolean}
+    FirewallFile:
+      type: object
+      required: [path, content]
+      properties:
+        path: {type: string}
+        content: {type: string}
+    FirewallComponent:
+      type: object
+      required: [id, name, kind, state, settings, rules, files]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        kind: {type: string, description: "builtin / third_party / info"}
+        state: {type: string, description: "on / off / unknown / info"}
+        detail: {type: string}
+        settings:
+          type: array
+          items: {$ref: "#/components/schemas/FirewallSetting"}
+        rules:
+          type: array
+          items: {$ref: "#/components/schemas/FirewallRule"}
+        files:
+          type: array
+          items: {$ref: "#/components/schemas/FirewallFile"}
+    FirewallStatus:
+      type: object
+      required: [at, platform, active, components]
+      properties:
+        at: {type: string, format: date-time}
+        platform: {type: string}
+        active: {type: boolean, description: "하나 이상의 방화벽이 켜져 있음"}
+        components:
+          type: array
+          items: {$ref: "#/components/schemas/FirewallComponent"}
     MetricPoint:
       type: object
       required: [t, v]

@@ -262,6 +262,58 @@ type EventList struct {
 // EventSeverity defines model for EventSeverity.
 type EventSeverity string
 
+// FirewallComponent defines model for FirewallComponent.
+type FirewallComponent struct {
+	Detail *string        `json:"detail,omitempty"`
+	Files  []FirewallFile `json:"files"`
+	Id     string         `json:"id"`
+
+	// Kind builtin / third_party / info
+	Kind     string            `json:"kind"`
+	Name     string            `json:"name"`
+	Rules    []FirewallRule    `json:"rules"`
+	Settings []FirewallSetting `json:"settings"`
+
+	// State on / off / unknown / info
+	State string `json:"state"`
+}
+
+// FirewallFile defines model for FirewallFile.
+type FirewallFile struct {
+	Content string `json:"content"`
+	Path    string `json:"path"`
+}
+
+// FirewallRule defines model for FirewallRule.
+type FirewallRule struct {
+	// Action allow / block / rule / active / inactive
+	Action string  `json:"action"`
+	Note   *string `json:"note,omitempty"`
+
+	// Target 앱 경로, 포트, 규칙 문장
+	Target string `json:"target"`
+	Warn   bool   `json:"warn"`
+}
+
+// FirewallSetting defines model for FirewallSetting.
+type FirewallSetting struct {
+	Name string  `json:"name"`
+	Note *string `json:"note,omitempty"`
+
+	// Status ok / warn / fail
+	Status string `json:"status"`
+	Value  string `json:"value"`
+}
+
+// FirewallStatus defines model for FirewallStatus.
+type FirewallStatus struct {
+	// Active 하나 이상의 방화벽이 켜져 있음
+	Active     bool                `json:"active"`
+	At         time.Time           `json:"at"`
+	Components []FirewallComponent `json:"components"`
+	Platform   string              `json:"platform"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	// Status Example: ok
@@ -331,7 +383,9 @@ type NetInterface struct {
 
 // NetworkStatus defines model for NetworkStatus.
 type NetworkStatus struct {
-	At          time.Time         `json:"at"`
+	At time.Time `json:"at"`
+
+	// Connections LISTEN 을 제외한 모든 TCP 연결 (외부 → 내부 → 로컬 순, 최대 1000개)
 	Connections []NetConnection   `json:"connections"`
 	Dns         []string          `json:"dns"`
 	Established int               `json:"established"`
@@ -465,6 +519,9 @@ type ServerInterface interface {
 	// CreateEvent 탐지 이벤트 등록
 	// (POST /events)
 	CreateEvent(w http.ResponseWriter, r *http.Request)
+	// GetFirewallStatus 방화벽 실행 여부와 설정 내역 (조회 시점에 수집)
+	// (GET /firewall/status)
+	GetFirewallStatus(w http.ResponseWriter, r *http.Request)
 	// GetHealth 서버 상태 확인
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -718,6 +775,20 @@ func (siw *ServerInterfaceWrapper) CreateEvent(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetFirewallStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetFirewallStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFirewallStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -933,6 +1004,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/clipboard/test", wrapper.RunClipboardTest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/system/status", wrapper.GetSystemStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/network/status", wrapper.GetNetworkStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/firewall/status", wrapper.GetFirewallStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics", wrapper.GetMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
@@ -1197,6 +1269,27 @@ func (response CreateEvent400JSONResponse) VisitCreateEventResponse(w http.Respo
 	return err
 }
 
+type GetFirewallStatusRequestObject struct {
+}
+
+type GetFirewallStatusResponseObject interface {
+	VisitGetFirewallStatusResponse(w http.ResponseWriter) error
+}
+
+type GetFirewallStatus200JSONResponse FirewallStatus
+
+func (response GetFirewallStatus200JSONResponse) VisitGetFirewallStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -1347,6 +1440,9 @@ type StrictServerInterface interface {
 	// CreateEvent 탐지 이벤트 등록
 	// (POST /events)
 	CreateEvent(ctx context.Context, request CreateEventRequestObject) (CreateEventResponseObject, error)
+	// GetFirewallStatus 방화벽 실행 여부와 설정 내역 (조회 시점에 수집)
+	// (GET /firewall/status)
+	GetFirewallStatus(ctx context.Context, request GetFirewallStatusRequestObject) (GetFirewallStatusResponseObject, error)
 	// GetHealth 서버 상태 확인
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -1578,6 +1674,30 @@ func (sh *strictHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateEventResponseObject); ok {
 		if err := validResponse.VisitCreateEventResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFirewallStatus operation middleware
+func (sh *strictHandler) GetFirewallStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetFirewallStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFirewallStatus(ctx, request.(GetFirewallStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFirewallStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFirewallStatusResponseObject); ok {
+		if err := validResponse.VisitGetFirewallStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

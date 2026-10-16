@@ -34,3 +34,5 @@ type netSampler struct{}
 func exeUnsigned(string) (bool, bool) { return false, false }
 
 func sampleNetwork(context.Context, *netSampler) (netRaw, error) { return netRaw{}, errUnsupported }
+
+func collectFirewall(context.Context) ([]FirewallComponent, error) { return nil, errUnsupported }

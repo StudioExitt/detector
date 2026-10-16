@@ -139,3 +139,37 @@ func nonNilInts(s []int) []int {
 	}
 	return s
 }
+
+func (h *Handler) GetFirewallStatus(ctx context.Context, _ api.GetFirewallStatusRequestObject) (api.GetFirewallStatusResponseObject, error) {
+	s, err := detect.CollectFirewall(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := api.GetFirewallStatus200JSONResponse{At: s.At.In(h.loc), Platform: s.Platform, Active: s.Active, Components: []api.FirewallComponent{}}
+	for _, c := range s.Components {
+		ac := api.FirewallComponent{Id: c.ID, Name: c.Name, Kind: c.Kind, State: c.State,
+			Settings: []api.FirewallSetting{}, Rules: []api.FirewallRule{}, Files: []api.FirewallFile{}}
+		if c.Detail != "" {
+			ac.Detail = &c.Detail
+		}
+		for _, x := range c.Settings {
+			st := api.FirewallSetting{Name: x.Name, Value: x.Value, Status: x.Status}
+			if x.Note != "" {
+				st.Note = &x.Note
+			}
+			ac.Settings = append(ac.Settings, st)
+		}
+		for _, r := range c.Rules {
+			ar := api.FirewallRule{Target: r.Target, Action: r.Action, Warn: r.Warn}
+			if r.Note != "" {
+				ar.Note = &r.Note
+			}
+			ac.Rules = append(ac.Rules, ar)
+		}
+		for _, f := range c.Files {
+			ac.Files = append(ac.Files, api.FirewallFile{Path: f.Path, Content: f.Content})
+		}
+		out.Components = append(out.Components, ac)
+	}
+	return out, nil
+}

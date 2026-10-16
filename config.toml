@@ -48,6 +48,9 @@ interval = "5m"
 [detect.posture]           # 보안 설정 (macOS: SIP/Gatekeeper/방화벽/FileVault…, Linux: sshd/ASLR/LSM)
 interval = "10m"
 
+[detect.firewall]          # 방화벽 꺼짐·설정 약화·허용 앱 추가·pf 설정 변경·서드파티 방화벽 제거 (웹 "방화벽")
+interval = "1m"
+
 # 시스템 자원: CPU/메모리/디스크 이상징후 (웹 "시스템 상태")
 [detect.resources]
 interval = "30s"
