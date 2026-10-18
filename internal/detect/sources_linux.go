@@ -16,5 +16,11 @@ func detectorSources(name string) []string {
 		"process":   {"/proc/<pid>/exe, cmdline, 소유자", "삭제된 실행 파일 (exe → \"(deleted)\")"},
 		"accounts":  {"/etc/passwd, /etc/group (sudo, wheel, admin)", "/etc/shadow (빈 비밀번호, root 필요)"},
 		"posture":   {"sshd_config(.d) PermitRootLogin, PasswordAuthentication, PermitEmptyPasswords", "/proc/sys/kernel/randomize_va_space", "SELinux / AppArmor"},
+		"recording": {
+			"/proc/asound/card*/pcm*c/sub*/status (RUNNING 인 녹음 장치, owner_pid)",
+			"pactl list source-outputs (PulseAudio/PipeWire 녹음 스트림의 앱)",
+			"/proc/<pid>/fd → /dev/video* (카메라를 연 프로세스)",
+			"/proc: 화면/오디오 녹화 도구, 원격 화면 보기·제어 도구 (화면 캡처 자체는 OS 가 알려주지 않음)",
+		},
 	}[name]
 }

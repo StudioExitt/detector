@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
-import { Activity, BrickWall, Gauge, LayoutDashboard, ListTree, Network, Radar, ScanSearch, type LucideIcon } from 'lucide-react'
+import { Activity, BrickWall, Gauge, LayoutDashboard, ListTree, Network, Radar, ScanSearch, Video, type LucideIcon } from 'lucide-react'
 import type { MessageKey } from './i18n'
 import Dashboard from './pages/Dashboard'
 import DetectorsPage from './pages/DetectorsPage'
 import EventsPage from './pages/EventsPage'
 import FirewallPage from './pages/FirewallPage'
 import NetworkPage from './pages/NetworkPage'
+import RecordingPage from './pages/RecordingPage'
 import SystemPage from './pages/SystemPage'
 
 export type MenuItem = {
@@ -23,6 +24,7 @@ export const menus: MenuItem[] = [
   { path: '/system', labelKey: 'menu.system', icon: Gauge, element: <SystemPage /> },
   { path: '/network', labelKey: 'menu.network', icon: Network, element: <NetworkPage /> },
   { path: '/firewall', labelKey: 'menu.firewall', icon: BrickWall, element: <FirewallPage /> },
+  { path: '/recording', labelKey: 'menu.recording', icon: Video, element: <RecordingPage /> },
   { path: '/vuln-scan', labelKey: 'menu.vulnScan', icon: ScanSearch, element: <EventsPage category="vulnerability_scan" /> },
   { path: '/events', labelKey: 'menu.events', icon: ListTree, element: <EventsPage /> },
   { path: '/detectors', labelKey: 'menu.detectors', icon: Radar, element: <DetectorsPage /> },

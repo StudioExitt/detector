@@ -22,5 +22,12 @@ func detectorSources(name string) []string {
 			"launchctl print (sshd, screensharing), ARDAgent 프로세스",
 			"defaults: loginwindow (자동 로그인, 게스트), SoftwareUpdate (자동 보안 업데이트, 대기 업데이트)",
 		},
+		"recording": {
+			"unified log stream: ControlCenter sensor-indicators (메뉴 막대 화면 녹화·마이크·카메라 표시등, 앱 확인 불가 캡처의 PID)",
+			"CoreAudio: 입력 장치 IsRunningSomewhere, 오디오 입력 중인 프로세스 (macOS 14+)",
+			"CoreMediaIO: 카메라 IsRunningSomewhere",
+			"TCC.db (시스템·사용자): 화면 기록·마이크·카메라·입력 모니터링 허용 앱 (전체 디스크 접근 권한 필요)",
+			"ps: 화면/오디오 녹화 도구, 원격 화면 보기·제어 도구",
+		},
 	}[name]
 }

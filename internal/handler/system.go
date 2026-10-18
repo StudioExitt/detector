@@ -186,3 +186,54 @@ func (h *Handler) OpenFirewallSettings(ctx context.Context, _ api.OpenFirewallSe
 	}
 	return api.OpenFirewallSettings204Response{}, nil
 }
+
+func (h *Handler) GetRecordingStatus(_ context.Context, _ api.GetRecordingStatusRequestObject) (api.GetRecordingStatusResponseObject, error) {
+	v, _ := h.detect.Snapshot("recording")
+	s, ok := v.(detect.RecordingSnapshot)
+	if !ok {
+		return api.GetRecordingStatus404JSONResponse{NotFoundJSONResponse: api.NotFoundJSONResponse{
+			Message: "recording status not available yet (detect.recording disabled or first run pending)"}}, nil
+	}
+	out := api.GetRecordingStatus200JSONResponse{At: s.At.In(h.loc), Platform: s.Platform, Notes: nonNil(s.Notes),
+		Uses: []api.RecordingUse{}, Devices: []api.RecordingDevice{}, Tools: []api.RecordingTool{},
+		Permissions: []api.RecordingPermission{}, Recent: []api.RecordingActivity{}}
+	if s.PermError != "" {
+		out.PermError = &s.PermError
+	}
+	for _, u := range s.Uses {
+		au := api.RecordingUse{Kind: u.Kind, App: u.App, Name: u.Name, Pid: u.PID, Hidden: u.Hidden, Trusted: u.Trusted,
+			Since: u.Since.In(h.loc), Exe: optStr(u.Exe), Note: optStr(u.Note)}
+		out.Uses = append(out.Uses, au)
+	}
+	for _, d := range s.Devices {
+		out.Devices = append(out.Devices, api.RecordingDevice{Kind: d.Kind, Name: d.Name, InUse: d.InUse})
+	}
+	for _, t := range s.Tools {
+		out.Tools = append(out.Tools, api.RecordingTool{Kind: t.Kind, Label: t.Label, Pid: t.PID, User: t.User, Exe: t.Exe,
+			Args: t.Args, Trusted: t.Trusted, Warn: t.Warn, Note: optStr(t.Note)})
+	}
+	for _, p := range s.Permissions {
+		ap := api.RecordingPermission{Service: p.Service, Client: p.Client, Allowed: p.Allowed, Scope: p.Scope, Warn: p.Warn, Note: optStr(p.Note)}
+		if !p.Updated.IsZero() {
+			t := p.Updated.In(h.loc)
+			ap.Updated = &t
+		}
+		out.Permissions = append(out.Permissions, ap)
+	}
+	for _, r := range s.Recent {
+		ar := api.RecordingActivity{Kind: r.Kind, App: r.App, Name: r.Name, Pid: r.PID, Hidden: r.Hidden, Start: r.Start.In(h.loc)}
+		if !r.End.IsZero() {
+			t := r.End.In(h.loc)
+			ar.End = &t
+		}
+		out.Recent = append(out.Recent, ar)
+	}
+	return out, nil
+}
+
+func optStr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

@@ -37,3 +37,5 @@ func sampleNetwork(context.Context, *netSampler) (netRaw, error) { return netRaw
 
 func OpenFirewallSettings(context.Context) error                   { return ErrUnavailable }
 func collectFirewall(context.Context) ([]FirewallComponent, error) { return nil, errUnsupported }
+
+func newRecSource() recSource { return nil }

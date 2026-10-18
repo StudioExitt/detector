@@ -129,6 +129,56 @@ export type ClipboardTestResult = {
   checks: ClipboardCanaryCheck[]
 }
 
+export type RecordingKind = 'screen' | 'mic' | 'camera' | 'remote' | 'input'
+
+export type RecordingUse = {
+  kind: RecordingKind
+  app: string
+  name: string
+  pid: number
+  exe?: string
+  hidden: boolean
+  trusted: boolean
+  note?: string
+  since: string
+}
+
+export type RecordingTool = {
+  kind: RecordingKind
+  label: string
+  pid: number
+  user: string
+  exe: string
+  args: string
+  trusted: boolean
+  warn: boolean
+  note?: string
+}
+
+export type RecordingPermission = {
+  service: RecordingKind
+  client: string
+  allowed: boolean
+  scope: 'system' | 'user' | string
+  updated?: string
+  warn: boolean
+  note?: string
+}
+
+export type RecordingActivity = { kind: RecordingKind; app: string; name: string; pid: number; hidden: boolean; start: string; end?: string }
+
+export type RecordingStatus = {
+  at: string
+  platform: string
+  uses: RecordingUse[]
+  devices: { kind: RecordingKind; name: string; inUse: boolean }[]
+  tools: RecordingTool[]
+  permissions: RecordingPermission[]
+  permError?: string
+  recent: RecordingActivity[]
+  notes: string[]
+}
+
 export type EventList = { items: DetectEvent[]; total: number }
 
 export class ApiError extends Error {
@@ -174,6 +224,7 @@ export const api = {
   networkStatus: (signal?: AbortSignal) => request<NetworkStatus>('/network/status', { signal }),
   firewallStatus: (signal?: AbortSignal) => request<FirewallStatus>('/firewall/status', { signal }),
   openFirewallSettings: () => request<void>('/firewall/open', { method: 'POST' }),
+  recordingStatus: (signal?: AbortSignal) => request<RecordingStatus>('/recording/status', { signal }),
   metrics: (names: string[], range: MetricRange, signal?: AbortSignal) =>
     request<MetricSeriesList>(`/metrics${query({ names: names.join(','), range })}`, { signal }),
   clipboardTest: () => request<ClipboardTestResult>('/clipboard/test', { method: 'POST' }),

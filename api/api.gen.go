@@ -450,6 +450,95 @@ type ProcUsage struct {
 	User      string     `json:"user"`
 }
 
+// RecordingActivity defines model for RecordingActivity.
+type RecordingActivity struct {
+	App string `json:"app"`
+
+	// End 없으면 사용 중
+	End    *time.Time `json:"end,omitempty"`
+	Hidden bool       `json:"hidden"`
+	Kind   string     `json:"kind"`
+	Name   string     `json:"name"`
+	Pid    int        `json:"pid"`
+	Start  time.Time  `json:"start"`
+}
+
+// RecordingDevice defines model for RecordingDevice.
+type RecordingDevice struct {
+	InUse bool `json:"inUse"`
+
+	// Kind mic / camera
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
+// RecordingPermission defines model for RecordingPermission.
+type RecordingPermission struct {
+	Allowed bool    `json:"allowed"`
+	Client  string  `json:"client"`
+	Note    *string `json:"note,omitempty"`
+
+	// Scope system / user
+	Scope string `json:"scope"`
+
+	// Service screen / mic / camera / input
+	Service string     `json:"service"`
+	Updated *time.Time `json:"updated,omitempty"`
+	Warn    bool       `json:"warn"`
+}
+
+// RecordingStatus defines model for RecordingStatus.
+type RecordingStatus struct {
+	At      time.Time         `json:"at"`
+	Devices []RecordingDevice `json:"devices"`
+	Notes   []string          `json:"notes"`
+
+	// PermError 권한 목록을 읽지 못한 이유 (macOS: 전체 디스크 접근 권한 필요)
+	PermError   *string               `json:"permError,omitempty"`
+	Permissions []RecordingPermission `json:"permissions"`
+	Platform    string                `json:"platform"`
+
+	// Recent 서버 시작 후 감지된 사용 기록 (최신순, 최대 100건)
+	Recent []RecordingActivity `json:"recent"`
+	Tools  []RecordingTool     `json:"tools"`
+	Uses   []RecordingUse      `json:"uses"`
+}
+
+// RecordingTool defines model for RecordingTool.
+type RecordingTool struct {
+	Args string `json:"args"`
+	Exe  string `json:"exe"`
+
+	// Kind screen / mic / remote
+	Kind    string  `json:"kind"`
+	Label   string  `json:"label"`
+	Note    *string `json:"note,omitempty"`
+	Pid     int     `json:"pid"`
+	Trusted bool    `json:"trusted"`
+	User    string  `json:"user"`
+	Warn    bool    `json:"warn"`
+}
+
+// RecordingUse defines model for RecordingUse.
+type RecordingUse struct {
+	// App 번들 ID, 프로세스 이름 또는 실행 경로
+	App string  `json:"app"`
+	Exe *string `json:"exe,omitempty"`
+
+	// Hidden OS 가 앱을 확인하지 못한 캡처
+	Hidden bool `json:"hidden"`
+
+	// Kind screen / mic / camera
+	Kind  string    `json:"kind"`
+	Name  string    `json:"name"`
+	Note  *string   `json:"note,omitempty"`
+	Pid   int       `json:"pid"`
+	Since time.Time `json:"since"`
+
+	// Trusted trustedApps 에 포함 (이벤트 제외)
+	Trusted bool `json:"trusted"`
+}
+
 // SystemStatus defines model for SystemStatus.
 type SystemStatus struct {
 	At     time.Time   `json:"at"`
@@ -534,6 +623,9 @@ type ServerInterface interface {
 	// GetNetworkStatus 현재 네트워크 연결 상태와 외부 접속
 	// (GET /network/status)
 	GetNetworkStatus(w http.ResponseWriter, r *http.Request)
+	// GetRecordingStatus 화면 녹화·마이크·카메라 사용 현황, 녹화/원격 도구, 녹화 권한
+	// (GET /recording/status)
+	GetRecordingStatus(w http.ResponseWriter, r *http.Request)
 	// GetSystemStatus 현재 CPU/메모리/디스크/상위 프로세스
 	// (GET /system/status)
 	GetSystemStatus(w http.ResponseWriter, r *http.Request)
@@ -880,6 +972,20 @@ func (siw *ServerInterfaceWrapper) GetNetworkStatus(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetRecordingStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetRecordingStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRecordingStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSystemStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetSystemStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -1023,6 +1129,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/network/status", wrapper.GetNetworkStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/firewall/status", wrapper.GetFirewallStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/firewall/open", wrapper.OpenFirewallSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/recording/status", wrapper.GetRecordingStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics", wrapper.GetMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
@@ -1429,6 +1536,41 @@ func (response GetNetworkStatus404JSONResponse) VisitGetNetworkStatusResponse(w 
 	return err
 }
 
+type GetRecordingStatusRequestObject struct {
+}
+
+type GetRecordingStatusResponseObject interface {
+	VisitGetRecordingStatusResponse(w http.ResponseWriter) error
+}
+
+type GetRecordingStatus200JSONResponse RecordingStatus
+
+func (response GetRecordingStatus200JSONResponse) VisitGetRecordingStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRecordingStatus404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetRecordingStatus404JSONResponse) VisitGetRecordingStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSystemStatusRequestObject struct {
 }
 
@@ -1502,6 +1644,9 @@ type StrictServerInterface interface {
 	// GetNetworkStatus 현재 네트워크 연결 상태와 외부 접속
 	// (GET /network/status)
 	GetNetworkStatus(ctx context.Context, request GetNetworkStatusRequestObject) (GetNetworkStatusResponseObject, error)
+	// GetRecordingStatus 화면 녹화·마이크·카메라 사용 현황, 녹화/원격 도구, 녹화 권한
+	// (GET /recording/status)
+	GetRecordingStatus(ctx context.Context, request GetRecordingStatusRequestObject) (GetRecordingStatusResponseObject, error)
 	// GetSystemStatus 현재 CPU/메모리/디스크/상위 프로세스
 	// (GET /system/status)
 	GetSystemStatus(ctx context.Context, request GetSystemStatusRequestObject) (GetSystemStatusResponseObject, error)
@@ -1846,6 +1991,30 @@ func (sh *strictHandler) GetNetworkStatus(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetNetworkStatusResponseObject); ok {
 		if err := validResponse.VisitGetNetworkStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRecordingStatus operation middleware
+func (sh *strictHandler) GetRecordingStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetRecordingStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRecordingStatus(ctx, request.(GetRecordingStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRecordingStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRecordingStatusResponseObject); ok {
+		if err := validResponse.VisitGetRecordingStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

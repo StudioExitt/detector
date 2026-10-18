@@ -51,7 +51,14 @@ interval = "10m"
 [detect.firewall]          # 방화벽 꺼짐·설정 약화·허용 앱 추가·pf 설정 변경·서드파티 방화벽 제거 (웹 "방화벽")
 interval = "1m"
 
-# 시스템 자원: CPU/메모리/디스크 이상징후 (웹 "시스템 상태")
+# 녹화 감시: 화면 녹화/캡처·마이크 녹음·카메라 촬영 중인 앱, 녹화/원격 도구, 녹화 권한 추가 (웹 "녹화 감시")
+#  - macOS: 메뉴 막대 표시등과 같은 정보(ControlCenter 로그) + CoreAudio/CoreMediaIO, 권한 목록은 전체 디스크 접근 권한 필요
+#  - Linux: ALSA/pactl 녹음, /dev/video* 를 연 프로세스, 녹화/원격 도구 프로세스
+[detect.recording]
+interval = "10s"
+# trustedApps = ["com.apple.systemuiserver", "com.apple.screencaptureui", "us.zoom.xos"]   # 이벤트 제외 (번들 ID·프로세스 이름·경로)
+
+# 시스템 자원: CPU/메모리/디스크 이상징후 (웹 "시스템")
 [detect.resources]
 interval = "30s"
 procCpuPercent = 80       # 프로세스 CPU (100 = 코어 1개) 가 sustain 동안 지속되면 탐지
@@ -63,7 +70,7 @@ diskCritPercent = 95
 diskGrowthGB = 5          # 10분 내 증가량
 # ignoreProcesses = ["java"]   # macOS 는 SIP 보호 경로(/System, /usr/libexec ...) 프로세스를 자동 제외
 
-# 네트워크: 연결 상태 + 외부 접속 이상징후 (웹 "네트워크 점검")
+# 네트워크: 연결 상태 + 외부 접속 이상징후 (웹 "네트워크")
 [detect.network]
 interval = "30s"
 probeTargets = ["1.1.1.1:443", "8.8.8.8:443"]   # 인터넷 연결 확인 (빈 배열이면 점검 안 함)

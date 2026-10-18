@@ -179,6 +179,7 @@ func buildDetectors(cfg config.DetectConfig) []registered {
 	add(cfg.Accounts, newAccountsDetector())
 	add(cfg.Posture, newPostureDetector())
 	add(cfg.Firewall, newFirewallDetector())
+	add(cfg.Recording.DetectorConfig, newRecordingDetector(cfg.Recording))
 	add(cfg.Resources.DetectorConfig, newResourcesDetector(cfg.Resources))
 	add(cfg.Network.DetectorConfig, newNetworkDetector(cfg.Network))
 	add(cfg.Clipboard.DetectorConfig, newClipboardDetector(cfg.Clipboard))

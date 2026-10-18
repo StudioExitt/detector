@@ -1,6 +1,6 @@
 # Detector
 
-해킹 흔적, 비정상 시스템 점유, 취약한 보안 설정, 악성 브라우저 확장, 클립보드 지갑 주소 바꿔치기 등을 감시하는 **로컬 보안 모니터**입니다.
+해킹 흔적, 비정상 시스템 점유, 취약한 보안 설정, 악성 브라우저 확장, 클립보드 지갑 주소 바꿔치기, 몰래 하는 화면 녹화·녹음·촬영 등을 감시하는 **로컬 보안 모니터**입니다.
 
 - Go 서버와 React 웹 UI 가 **단일 바이너리**로 빌드되어, 프로그램 하나만 실행하면 됩니다.
 - macOS 를 기준으로 가장 상세하게 감시하며, Linux 도 지원합니다. (클립보드·브라우저 확장 감시는 macOS 전용)
@@ -33,9 +33,10 @@ make build                           # 빌드만 → build/detector
 |---|---|
 | 대시보드 | 서버 상태, 탐지기 동작 요약, 최근 이벤트 |
 | 침입 탐지 | 침입 관련 탐지 이벤트 |
-| 시스템 상태 | CPU·메모리(압박)·스왑·디스크 현황, 사용률 추이 차트, CPU/메모리 상위 프로세스, 자원 이상 이벤트 |
-| 네트워크 점검 | 인터넷 연결·지연, 게이트웨이·DNS·프록시, 트래픽/지연/외부 연결 차트, 프로세스별 연결, **연결 목록**(연결 수 타일·프로세스 행 클릭 → 범위/상태/검색 필터), 네트워크 이벤트 |
+| 시스템 | CPU·메모리(압박)·스왑·디스크 현황, 사용률 추이 차트, CPU/메모리 상위 프로세스, 자원 이상 이벤트 |
+| 네트워크 | 인터넷 연결·지연, 게이트웨이·DNS·프록시, 트래픽/지연/외부 연결 차트, 프로세스별 연결, **연결 목록**(연결 수 타일·프로세스 행 클릭 → 범위/상태/검색 필터), 네트워크 이벤트 |
 | 방화벽 | 방화벽 동작 여부, 구성요소별 설정·허용/차단 규칙·설정 파일, 방화벽 변경 이벤트 |
+| 녹화 감시 | 화면·마이크·카메라 사용 여부와 사용 중인 앱, 장치 상태, 녹화·원격 도구, 녹화 권한(허용 앱), 최근 사용 기록, 녹화 감시 이벤트 |
 | 취약점 점검 | 취약한 보안 설정 등 취약점 이벤트 |
 | 전체 이벤트 | 모든 이벤트 |
 | 탐지기 상태 | 탐지기별 동작 상태 → 클릭하면 상세 (현재 점검 항목 · 실행 이력 · 탐지 이벤트), 클립보드 카나리아 테스트 |
@@ -132,6 +133,7 @@ detector/
 | `firewall` 방화벽 | 방화벽 꺼짐, 설정 약화(스텔스·전체 차단 해제, 서명 앱 자동 허용 등), 수신 허용 앱/규칙 추가(스크립트 인터프리터·임시 경로면 high), pf 설정 파일 변경, 서드파티 방화벽 제거 | 애플리케이션 방화벽(`socketfilterfw`), pf(`pfctl` 은 root, 설정 파일은 일반 권한), 네트워크 시스템 확장(Little Snitch, LuLu 등) | ufw, firewalld, nftables, iptables (규칙 조회는 대부분 root) |
 | `resources` 시스템 자원 | 프로세스 CPU 장기 점유(채굴 의심), 시스템 CPU 과부하, 메모리 압박, 메모리 과점유, 디스크 부족·급증 | top, vm_stat, sysctl, ps, statfs | `/proc`, PSI, statfs |
 | `network` 네트워크 | 의심 포트(백도어·IRC·Tor·채굴 풀) 연결, 임시 경로/서명 없는 프로그램의 외부 통신, 대량 연결·다수 호스트·아웃바운드 스캔, 대용량 업로드(macOS), DNS·프록시·게이트웨이 MAC 변경, 인터넷 끊김 | route, arp, scutil, netstat, codesign | `/proc/net/*`, resolv.conf |
+| `recording` 녹화 감시 | 화면 녹화/캡처·마이크 녹음·카메라 촬영 시작, 앱을 확인할 수 없는 캡처, 녹화·원격 화면 도구 실행, 녹화 권한 새로 허용 | ControlCenter 표시등 로그(`log stream`), CoreAudio, CoreMediaIO, TCC.db, ps | ALSA(`/proc/asound`), pactl, `/dev/video*` 를 연 프로세스, `/proc` |
 | `clipboard` 클립보드 (macOS) | 지갑 주소 바꿔치기(클리퍼) | NSPasteboard | — |
 | `extensions` 브라우저 확장 (macOS) | 악성 확장 (Chrome 계열 + Firefox) | 프로필별 Secure Preferences, manifest, JS 코드, 강제 설치 정책 | — |
 
@@ -149,6 +151,7 @@ detector/
 | firewall | `firewall.disabled`, `firewall.enabled`, `firewall.removed`, `firewall.setting_changed`, `firewall.rule_added`, `firewall.rule_removed`, `firewall.config_changed` |
 | resources | `res.cpu_hog`, `res.cpu_high`, `res.mem_pressure`, `res.mem_hog`, `res.disk_full`, `res.disk_growth` |
 | network | `net.suspicious_port`, `net.suspicious_process`, `net.unsigned_process`, `net.conn_flood`, `net.many_hosts`, `net.outbound_scan`, `net.large_upload`, `net.dns_changed`, `net.proxy_set`, `net.proxy_changed`, `net.gateway_mac_changed`, `net.offline` |
+| recording | `rec.screen_active`, `rec.mic_active`, `rec.camera_active`, `rec.unattributed_capture`, `rec.tool_running`, `rec.permission_granted` |
 | clipboard | `clipboard.address_swapped`, `clipboard.rapid_rewrite`, `clipboard.canary_swapped` |
 | extensions | `browser.ext_risky`, `browser.ext_new`, `browser.ext_perm_escalation`, `browser.ext_new_verdict`, `browser.ext_blocklisted`, `browser.ext_policy_install`, `browser.ext_sideload` |
 
@@ -161,7 +164,18 @@ detector/
 - 주의 표시: 스크립트 인터프리터(python3, ruby, node …)의 수신 허용 — 어떤 스크립트든 포트를 열 수 있음, 임시 경로 프로그램, 삭제된 앱의 남은 규칙
 - 화면의 현재 상태는 조회할 때마다 새로 수집하고, 탐지기는 `interval`(기본 1분)마다 변경을 감시합니다. 방화벽이 꺼져 있다는 사실 자체는 `posture` 탐지기가 한 번 보고합니다.
 
-### 시스템 상태 / 네트워크 (`[detect.resources]`, `[detect.network]`)
+### 화면 녹화·녹음·촬영 감시 (`[detect.recording]`)
+
+- **macOS — 사용 중인 앱**: 메뉴 막대의 화면 기록(보라색)·마이크(주황색)·카메라(초록색) 표시등과 같은 정보를 ControlCenter 의 `sensor-indicators` 로그에서 실시간(`log stream`)으로 받습니다. 기동 시 최근 1시간 로그로 현재 상태를 복원하고, 수집 주기(`interval`, 기본 10초) 사이에 끝난 짧은 캡처(스크린샷 등)도 한 번은 보고합니다.
+- **macOS — 앱 확인 불가 캡처** (`rec.unattributed_capture`, high): macOS 가 앱 이름·경로를 확인하지 못한 화면/마이크/카메라 사용입니다. 로그의 감사 토큰에서 PID 를 꺼내 실행 파일을 함께 기록합니다. 백그라운드 CLI 도구나 숨겨진 프로그램일 수 있습니다.
+- **장치 상태**: CoreAudio(입력 장치별 사용 여부, macOS 14+ 는 녹음 중인 프로세스 PID 까지), CoreMediaIO(카메라별 사용 여부). 장치는 사용 중인데 앱을 알 수 없으면 "앱 확인 불가" 로 표시합니다.
+- **녹화·원격 도구** (`rec.tool_running`): OBS, ffmpeg 화면/오디오 캡처, `screencapture -v`, Loom, Kap, CleanShot X 등 녹화 도구와 AnyDesk, TeamViewer, RustDesk, Chrome 원격 데스크톱, ScreenConnect, macOS 화면 공유(접속 중), VNC 등 원격 화면 도구. 임시 경로에서 실행되면 high.
+- **녹화 권한** (`rec.permission_granted`): 화면 기록·마이크·카메라·입력 모니터링이 허용된 앱 목록(TCC.db). 첫 실행은 기준선만 저장하고 이후 새로 허용된 앱을 보고합니다. 스크립트 인터프리터·임시 경로 프로그램이 허용되면 high. **전체 디스크 접근 권한**(시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한에 detector 바이너리 또는 실행한 터미널 추가)이 있어야 읽을 수 있습니다.
+- **Linux**: 녹음은 `/proc/asound` 의 RUNNING 상태 녹음 장치와 `pactl list source-outputs`(데스크톱 사용자 세션에서 실행할 때), 카메라는 `/dev/video*` 를 연 프로세스로 판단합니다. 화면 캡처는 OS 가 알려주지 않으므로 녹화·원격 도구 프로세스로만 판단합니다.
+- 같은 앱의 사용은 시작될 때 한 번 보고합니다 (계속 사용 중이면 다시 보고하지 않음). 직접 사용하는 앱(화상회의 등)은 `trustedApps` 에 번들 ID·프로세스 이름·경로를 넣으면 화면에는 표시되지만 이벤트는 만들지 않습니다. 기본값은 macOS 스크린샷 UI(`com.apple.systemuiserver`, `com.apple.screencaptureui`)입니다.
+- **한계**: macOS 의 표시등은 앱 단위라서, 터미널에서 실행한 도구는 터미널 앱(예: Terminal, iTerm, Ghostty)으로 표시됩니다. 최근 사용 기록은 메모리에만 있으며 재시작하면 초기화됩니다 (이벤트는 DB 에 남음).
+
+### 시스템 / 네트워크 (`[detect.resources]`, `[detect.network]`)
 
 - **CPU**: 프로세스가 `procCpuPercent`(기본 80%, 100% = 코어 1개) 이상을 `sustain`(기본 5분) 동안 유지하면 탐지. 2코어 이상 점유 또는 임시 경로 프로세스면 high(채굴 의심). macOS 는 SIP 보호 경로의 시스템 프로세스를 자동 제외 (`ignoreProcesses` 로 추가 제외)
 - **메모리/디스크**: 메모리 압박 warn·critical, 단일 프로세스 RAM `procMemPercent`(25%) 이상, 디스크 90/95% 이상, 10분 내 `diskGrowthGB`(5GB) 이상 증가
@@ -208,6 +222,7 @@ Swagger UI: `http://localhost:<apiPort>/swagger/` — 스펙은 `api/openapi.yam
 | GET | `/api/v1/network/status` | 현재 네트워크 상태·프로세스별 연결·연결 목록 (LISTEN 제외 TCP, 최대 1000개) |
 | GET | `/api/v1/firewall/status` | 방화벽 동작 여부와 설정 내역 (조회 시점에 수집) |
 | POST | `/api/v1/firewall/open` | 시스템 설정 → 네트워크 → 방화벽 열기 (macOS, 서버가 실행 중인 Mac 에서 열림) |
+| GET | `/api/v1/recording/status` | 화면·마이크·카메라 사용 현황, 장치, 녹화·원격 도구, 녹화 권한, 최근 사용 기록 |
 | GET | `/api/v1/metrics` | 시계열 지표 (`names=cpu.usage,mem.used_pct,...`, `range=1h\|6h\|24h\|7d`) |
 
 시계열 지표 이름: `cpu.usage`, `cpu.load1`, `mem.used_pct`, `mem.swap_used`, `disk.used_pct`, `net.rx_bps`, `net.tx_bps`, `net.established`, `net.external`, `net.latency_ms`
@@ -251,5 +266,6 @@ make dev-web    # 터미널 2: Vite 개발 서버 (핫 리로드) → http://loc
 | UI 대신 "웹 UI 가 빌드에 포함되지 않았습니다" | `NOWEB=1` 로 빌드했거나 UI 복사 전 빌드됨 → `make build` |
 | `make dev-web` 화면에서 API 오류 (500) | `VITE_PROXY_TARGET` 포트가 `apiPort` 와 다름 → `web/.env.development` 수정 후 개발 서버 재시작 |
 | 탐지 기록/기준선이 사라짐 | 루트가 아닌 곳에서 실행해 새 DB 가 생김 → 루트에서 실행 |
+| 녹화 감시 "TCC.db 읽기 불가" | 전체 디스크 접근 권한 필요 → 시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한에 detector(또는 실행한 터미널) 추가 후 재시작 |
 | 클립보드 탐지기 경고 "root 로 실행 중" | 클립보드는 로그인 사용자 세션에 속함 → 사용자 권한으로 실행 |
 | 일부 파일이 "읽기 불가" | 권한 부족 → root 로 실행하면 내용까지 비교 |

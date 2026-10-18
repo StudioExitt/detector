@@ -159,6 +159,20 @@ paths:
           description: 열림
         "404":
           $ref: "#/components/responses/NotFound"
+  /recording/status:
+    get:
+      tags: [system]
+      operationId: getRecordingStatus
+      summary: 화면 녹화·마이크·카메라 사용 현황, 녹화/원격 도구, 녹화 권한
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /metrics:
     get:
       tags: [system]
@@ -665,6 +679,87 @@ components:
         components:
           type: array
           items: {$ref: "#/components/schemas/FirewallComponent"}
+    RecordingUse:
+      type: object
+      required: [kind, app, name, pid, hidden, trusted, since]
+      properties:
+        kind: {type: string, description: "screen / mic / camera"}
+        app: {type: string, description: "번들 ID, 프로세스 이름 또는 실행 경로"}
+        name: {type: string}
+        pid: {type: integer}
+        exe: {type: string}
+        hidden: {type: boolean, description: "OS 가 앱을 확인하지 못한 캡처"}
+        trusted: {type: boolean, description: "trustedApps 에 포함 (이벤트 제외)"}
+        note: {type: string}
+        since: {type: string, format: date-time}
+    RecordingDevice:
+      type: object
+      required: [kind, name, inUse]
+      properties:
+        kind: {type: string, description: "mic / camera"}
+        name: {type: string}
+        inUse: {type: boolean}
+    RecordingTool:
+      type: object
+      required: [kind, label, pid, user, exe, args, trusted, warn]
+      properties:
+        kind: {type: string, description: "screen / mic / remote"}
+        label: {type: string}
+        pid: {type: integer}
+        user: {type: string}
+        exe: {type: string}
+        args: {type: string}
+        trusted: {type: boolean}
+        warn: {type: boolean}
+        note: {type: string}
+    RecordingPermission:
+      type: object
+      required: [service, client, allowed, scope, warn]
+      properties:
+        service: {type: string, description: "screen / mic / camera / input"}
+        client: {type: string}
+        allowed: {type: boolean}
+        scope: {type: string, description: "system / user"}
+        updated: {type: string, format: date-time}
+        warn: {type: boolean}
+        note: {type: string}
+    RecordingActivity:
+      type: object
+      required: [kind, app, name, pid, hidden, start]
+      properties:
+        kind: {type: string}
+        app: {type: string}
+        name: {type: string}
+        pid: {type: integer}
+        hidden: {type: boolean}
+        start: {type: string, format: date-time}
+        end: {type: string, format: date-time, description: "없으면 사용 중"}
+    RecordingStatus:
+      type: object
+      required: [at, platform, uses, devices, tools, permissions, recent, notes]
+      properties:
+        at: {type: string, format: date-time}
+        platform: {type: string}
+        uses:
+          type: array
+          items: {$ref: "#/components/schemas/RecordingUse"}
+        devices:
+          type: array
+          items: {$ref: "#/components/schemas/RecordingDevice"}
+        tools:
+          type: array
+          items: {$ref: "#/components/schemas/RecordingTool"}
+        permissions:
+          type: array
+          items: {$ref: "#/components/schemas/RecordingPermission"}
+        permError: {type: string, description: "권한 목록을 읽지 못한 이유 (macOS: 전체 디스크 접근 권한 필요)"}
+        recent:
+          type: array
+          description: 서버 시작 후 감지된 사용 기록 (최신순, 최대 100건)
+          items: {$ref: "#/components/schemas/RecordingActivity"}
+        notes:
+          type: array
+          items: {type: string}
     MetricPoint:
       type: object
       required: [t, v]
