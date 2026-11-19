@@ -384,6 +384,15 @@ func (m *Manager) UsbEject(ctx context.Context, disk string, force bool) (UsbAct
 	})
 }
 
+// UsbTransferred records a finished web UI file transfer (USB activity + event).
+func (m *Manager) UsbTransferred(ctx context.Context, target, detail string, ok bool) {
+	if _, err := m.usbAction(ctx, func(a usbActor) (UsbActionResult, []Finding, error) {
+		return a.UsbTransferred(target, detail, ok)
+	}); err != nil {
+		m.log.Warn("usb transfer not recorded", "target", target, "err", err)
+	}
+}
+
 func (m *Manager) usbAction(ctx context.Context, fn func(usbActor) (UsbActionResult, []Finding, error)) (UsbActionResult, error) {
 	for _, e := range m.entries {
 		a, ok := e.det.(usbActor)

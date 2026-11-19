@@ -134,11 +134,33 @@ type usbSource interface {
 type usbActor interface {
 	UsbRelease(ctx context.Context, target string, pids []int, hard, eject bool) (UsbActionResult, []Finding, error)
 	UsbEject(ctx context.Context, disk string, force bool) (UsbActionResult, []Finding, error)
+	UsbTransferred(target, detail string, ok bool) (UsbActionResult, []Finding, error)
 }
 
 type usbWritePoint struct {
 	At    time.Time
-	Bytes uint64
+	Bytes uint64 // disk write counter
+	Other uint64 // counter minus what this server wrote itself (file transfers from the web UI)
+}
+
+// bytes the server itself wrote to external disks (by disk name), so its own
+// transfers don't raise usb.bulk_write
+var usbSelf = struct {
+	sync.Mutex
+	m map[string]uint64
+}{m: map[string]uint64{}}
+
+// NoteUsbSelfWrite records n bytes written by this server to an external disk.
+func NoteUsbSelfWrite(disk string, n uint64) {
+	usbSelf.Lock()
+	usbSelf.m[disk] += n
+	usbSelf.Unlock()
+}
+
+func usbSelfWritten(disk string) uint64 {
+	usbSelf.Lock()
+	defer usbSelf.Unlock()
+	return usbSelf.m[disk]
 }
 
 // usbDetector reports USB devices / disks being connected, devices never seen
@@ -264,8 +286,9 @@ func (d *usbDetector) Check(ctx context.Context, env *Env) (Report, error) {
 		if !k.StatsKnown {
 			continue
 		}
+		other := k.WriteBytes - min(k.WriteBytes, usbSelfWritten(k.Disk))
 		pts := d.writes[key]
-		if n := len(pts); n > 0 && k.WriteBytes < pts[n-1].Bytes {
+		if n := len(pts); n > 0 && (k.WriteBytes < pts[n-1].Bytes || other < pts[n-1].Other) {
 			pts = nil // counter reset (reconnected under the same name)
 		}
 		if n := len(pts); n > 0 {
@@ -273,12 +296,12 @@ func (d *usbDetector) Check(ctx context.Context, env *Env) (Report, error) {
 				k.WriteBps = float64(k.WriteBytes-pts[n-1].Bytes) / dt
 			}
 		}
-		pts = append(pts, usbWritePoint{At: now, Bytes: k.WriteBytes})
+		pts = append(pts, usbWritePoint{At: now, Bytes: k.WriteBytes, Other: other})
 		for len(pts) > 1 && now.Sub(pts[1].At) >= 10*time.Minute {
 			pts = pts[1:]
 		}
 		d.writes[key] = pts
-		k.Write10m = k.WriteBytes - pts[0].Bytes
+		k.Write10m = other - pts[0].Other // the server's own transfers excluded
 		if limit := uint64(d.cfg.WriteMB * 1024 * 1024); limit > 0 && k.Write10m >= limit && !k.Trusted {
 			findings = append(findings, bulkWriteFinding(*k))
 		}
@@ -287,6 +310,19 @@ func (d *usbDetector) Check(ctx context.Context, env *Env) (Report, error) {
 		if !curDisks[key] {
 			delete(d.writes, key)
 		}
+	}
+	if !env.FirstRun {
+		names := map[string]bool{}
+		for _, k := range s.Disks {
+			names[k.Disk] = true
+		}
+		usbSelf.Lock()
+		for disk := range usbSelf.m {
+			if !names[disk] {
+				delete(usbSelf.m, disk) // disconnected: counters restart on reconnect
+			}
+		}
+		usbSelf.Unlock()
 	}
 	d.disks = curDisks
 
@@ -670,6 +706,18 @@ func (d *usbDetector) UsbEject(ctx context.Context, disk string, force bool) (Us
 		Key:     kind + "|" + disk + "|" + now.Format(time.RFC3339Nano),
 		Message: fmt.Sprintf("사용자 요청으로 %s %s: %s%s", disk, what, orNone(k.Name), resultText(res.OK))}
 	return res, []Finding{f}, nil
+}
+
+// UsbTransferred records a finished file transfer made from the web UI.
+func (d *usbDetector) UsbTransferred(target, detail string, ok bool) (UsbActionResult, []Finding, error) {
+	now := time.Now()
+	d.mu.Lock()
+	d.addRecent(UsbActivity{At: now, Kind: "transfer", Target: target, Detail: detail, OK: ok})
+	d.mu.Unlock()
+	f := Finding{Rule: "usb.action", Category: CategoryIntrusion, Severity: SevLow, Source: target,
+		Key:     "transfer|" + target + "|" + now.Format(time.RFC3339Nano),
+		Message: "사용자 요청으로 파일 전송: " + target + " — " + detail + resultText(ok)}
+	return UsbActionResult{OK: ok}, []Finding{f}, nil
 }
 
 func lastStepDetail(r UsbActionResult) string {

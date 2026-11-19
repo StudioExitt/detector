@@ -86,6 +86,27 @@ func (e EventSeverity) Valid() bool {
 	}
 }
 
+// Defines values for UsbFileLocationKind.
+const (
+	Mtp    UsbFileLocationKind = "mtp"
+	Pc     UsbFileLocationKind = "pc"
+	Volume UsbFileLocationKind = "volume"
+)
+
+// Valid indicates whether the value is a known member of the UsbFileLocationKind enum.
+func (e UsbFileLocationKind) Valid() bool {
+	switch e {
+	case Mtp:
+		return true
+	case Pc:
+		return true
+	case Volume:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UsbReleaseRequestSignal.
 const (
 	Kill UsbReleaseRequestSignal = "kill"
@@ -98,6 +119,30 @@ func (e UsbReleaseRequestSignal) Valid() bool {
 	case Kill:
 		return true
 	case Term:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UsbTransferJobState.
+const (
+	Canceled UsbTransferJobState = "canceled"
+	Done     UsbTransferJobState = "done"
+	Failed   UsbTransferJobState = "failed"
+	Running  UsbTransferJobState = "running"
+)
+
+// Valid indicates whether the value is a known member of the UsbTransferJobState enum.
+func (e UsbTransferJobState) Valid() bool {
+	switch e {
+	case Canceled:
+		return true
+	case Done:
+		return true
+	case Failed:
+		return true
+	case Running:
 		return true
 	default:
 		return false
@@ -578,7 +623,7 @@ type UsbActivity struct {
 	At     time.Time `json:"at"`
 	Detail string    `json:"detail"`
 
-	// Kind connect / disconnect / eject / force_eject / kill
+	// Kind connect / disconnect / eject / force_eject / kill / transfer
 	Kind   string `json:"kind"`
 	Ok     bool   `json:"ok"`
 	Target string `json:"target"`
@@ -630,6 +675,47 @@ type UsbEjectRequest struct {
 
 	// Force 열린 파일을 무시하고 강제 언마운트 (쓰는 중인 데이터 손상 가능)
 	Force *bool `json:"force,omitempty"`
+}
+
+// UsbFileEntry defines model for UsbFileEntry.
+type UsbFileEntry struct {
+	Dir      bool       `json:"dir"`
+	Id       string     `json:"id"`
+	Modified *time.Time `json:"modified,omitempty"`
+	Name     string     `json:"name"`
+	Size     int64      `json:"size"`
+}
+
+// UsbFileList defines model for UsbFileList.
+type UsbFileList struct {
+	Dir      string          `json:"dir"`
+	Entries  []UsbFileEntry  `json:"entries"`
+	Location UsbFileLocation `json:"location"`
+}
+
+// UsbFileLocation defines model for UsbFileLocation.
+type UsbFileLocation struct {
+	Detail string `json:"detail"`
+
+	// Error 지금 사용할 수 없는 이유 (휴대폰 잠김, 다른 앱이 사용 중 등)
+	Error *string `json:"error,omitempty"`
+	Free  int64   `json:"free"`
+
+	// Id pc:<n> / vol:<볼륨 ID> / mtp:<장치 ID>:<저장소 ID>
+	Id       string              `json:"id"`
+	Kind     UsbFileLocationKind `json:"kind"`
+	Name     string              `json:"name"`
+	ReadOnly bool                `json:"readOnly"`
+	Size     int64               `json:"size"`
+}
+
+// UsbFileLocationKind defines model for UsbFileLocation.Kind.
+type UsbFileLocationKind string
+
+// UsbFileLocations defines model for UsbFileLocations.
+type UsbFileLocations struct {
+	Locations []UsbFileLocation `json:"locations"`
+	Notes     []string          `json:"notes"`
 }
 
 // UsbProc defines model for UsbProc.
@@ -686,6 +772,66 @@ type UsbStep struct {
 	Target string `json:"target"`
 }
 
+// UsbTransferFile defines model for UsbTransferFile.
+type UsbTransferFile struct {
+	Error *string `json:"error,omitempty"`
+	Name  string  `json:"name"`
+	Ok    bool    `json:"ok"`
+}
+
+// UsbTransferJob defines model for UsbTransferJob.
+type UsbTransferJob struct {
+	Bytes     int64  `json:"bytes"`
+	BytesDone int64  `json:"bytesDone"`
+	Current   string `json:"current"`
+	Done      int    `json:"done"`
+	Failed    int    `json:"failed"`
+
+	// Files 복사할 파일 수 (폴더 내용 확인이 끝나면 정해짐)
+	Files      int        `json:"files"`
+	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+
+	// Folders 받을 곳에 만든(또는 합친) 폴더 수
+	Folders  int               `json:"folders"`
+	From     string            `json:"from"`
+	FromName string            `json:"fromName"`
+	Id       int               `json:"id"`
+	Move     bool              `json:"move"`
+	Results  []UsbTransferFile `json:"results"`
+
+	// Skipped 찾을 수 없었던 항목
+	Skipped   int                 `json:"skipped"`
+	StartedAt time.Time           `json:"startedAt"`
+	State     UsbTransferJobState `json:"state"`
+	To        string              `json:"to"`
+	ToName    string              `json:"toName"`
+}
+
+// UsbTransferJobState defines model for UsbTransferJob.State.
+type UsbTransferJobState string
+
+// UsbTransferList defines model for UsbTransferList.
+type UsbTransferList struct {
+	Items []UsbTransferJob `json:"items"`
+}
+
+// UsbTransferRequest defines model for UsbTransferRequest.
+type UsbTransferRequest struct {
+	// Ext 선택한 폴더 안에서 복사할 확장자, 쉼표로 구분 (예: mp3). 생략하면 전부
+	Ext     *string `json:"ext,omitempty"`
+	From    string  `json:"from"`
+	FromDir *string `json:"fromDir,omitempty"`
+
+	// Items fromDir 안의 파일·폴더 id
+	Items []string `json:"items"`
+
+	// Move 복사 후 원본 삭제
+	Move      *bool   `json:"move,omitempty"`
+	Overwrite *bool   `json:"overwrite,omitempty"`
+	To        string  `json:"to"`
+	ToDir     *string `json:"toDir,omitempty"`
+}
+
 // UsbVolume defines model for UsbVolume.
 type UsbVolume struct {
 	Free int64  `json:"free"`
@@ -704,6 +850,9 @@ type DetectorName = string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
+
+// Conflict defines model for Conflict.
+type Conflict = Error
 
 // NotFound defines model for NotFound.
 type NotFound = Error
@@ -732,6 +881,18 @@ type GetMetricsParams struct {
 // GetMetricsParamsRange defines parameters for GetMetrics.
 type GetMetricsParamsRange string
 
+// ListUsbFilesParams defines parameters for ListUsbFiles.
+type ListUsbFilesParams struct {
+	// Location 위치 ID (pc:0 / vol:disk4s1 / mtp:mtp-1-5:00010001)
+	Location string `form:"location" json:"location"`
+
+	// Dir 폴더 ID (생략하면 최상위). 목록 항목의 id 를 그대로 사용
+	Dir *string `form:"dir,omitempty" json:"dir,omitempty"`
+
+	// Ext 확장자 필터, 쉼표로 구분 (예: mp3,m4a). 폴더는 항상 포함
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+}
+
 // CreateEventJSONRequestBody defines body for CreateEvent for application/json ContentType.
 type CreateEventJSONRequestBody = NewEvent
 
@@ -740,6 +901,9 @@ type EjectUsbJSONRequestBody = UsbEjectRequest
 
 // ReleaseUsbJSONRequestBody defines body for ReleaseUsb for application/json ContentType.
 type ReleaseUsbJSONRequestBody = UsbReleaseRequest
+
+// StartUsbTransferJSONRequestBody defines body for StartUsbTransfer for application/json ContentType.
+type StartUsbTransferJSONRequestBody = UsbTransferRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -788,12 +952,27 @@ type ServerInterface interface {
 	// EjectUsb 외장 디스크 꺼내기 (force=true 이면 열린 파일을 무시하고 강제 언마운트)
 	// (POST /usb/eject)
 	EjectUsb(w http.ResponseWriter, r *http.Request)
+	// ListUsbFiles 위치의 폴더 내용
+	// (GET /usb/files)
+	ListUsbFiles(w http.ResponseWriter, r *http.Request, params ListUsbFilesParams)
+	// ListUsbFileLocations 파일 전송에 쓸 수 있는 위치 (PC 폴더, 마운트된 USB 디스크, 휴대폰 MTP 저장소)
+	// (GET /usb/files/locations)
+	ListUsbFileLocations(w http.ResponseWriter, r *http.Request)
 	// ReleaseUsb USB 디스크/장치를 점유한 프로세스 종료 (선택 시 이어서 꺼내기)
 	// (POST /usb/release)
 	ReleaseUsb(w http.ResponseWriter, r *http.Request)
 	// GetUsbStatus USB 장치·외장 디스크와 사용 중인 프로세스
 	// (GET /usb/status)
 	GetUsbStatus(w http.ResponseWriter, r *http.Request)
+	// ListUsbTransfers 최근 파일 전송 작업 (최신순, 최대 20개)
+	// (GET /usb/transfers)
+	ListUsbTransfers(w http.ResponseWriter, r *http.Request)
+	// StartUsbTransfer 파일 복사/이동 시작 (백그라운드 작업, 한 번에 하나)
+	// (POST /usb/transfers)
+	StartUsbTransfer(w http.ResponseWriter, r *http.Request)
+	// CancelUsbTransfer 진행 중인 전송 취소 (전송 중이던 파일은 지워지고, 끝난 파일은 그대로)
+	// (POST /usb/transfers/{id}/cancel)
+	CancelUsbTransfer(w http.ResponseWriter, r *http.Request, id int)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1179,6 +1358,79 @@ func (siw *ServerInterfaceWrapper) EjectUsb(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// ListUsbFiles operation middleware
+func (siw *ServerInterfaceWrapper) ListUsbFiles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUsbFilesParams
+
+	// ------------- Required query parameter "location" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "location", r.URL.Query(), &params.Location, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "location"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "location", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "dir" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dir", r.URL.Query(), &params.Dir, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dir"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dir", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "ext" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ext", r.URL.Query(), &params.Ext, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ext"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ext", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsbFiles(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsbFileLocations operation middleware
+func (siw *ServerInterfaceWrapper) ListUsbFileLocations(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsbFileLocations(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ReleaseUsb operation middleware
 func (siw *ServerInterfaceWrapper) ReleaseUsb(w http.ResponseWriter, r *http.Request) {
 
@@ -1198,6 +1450,60 @@ func (siw *ServerInterfaceWrapper) GetUsbStatus(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetUsbStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsbTransfers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsbTransfers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsbTransfers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartUsbTransfer operation middleware
+func (siw *ServerInterfaceWrapper) StartUsbTransfer(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartUsbTransfer(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelUsbTransfer operation middleware
+func (siw *ServerInterfaceWrapper) CancelUsbTransfer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelUsbTransfer(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1340,6 +1646,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/usb/status", wrapper.GetUsbStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/usb/release", wrapper.ReleaseUsb)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/usb/eject", wrapper.EjectUsb)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/usb/files/locations", wrapper.ListUsbFileLocations)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/usb/files", wrapper.ListUsbFiles)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/usb/transfers", wrapper.ListUsbTransfers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/usb/transfers", wrapper.StartUsbTransfer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/usb/transfers/{id}/cancel", wrapper.CancelUsbTransfer)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics", wrapper.GetMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
@@ -1349,6 +1660,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 }
 
 type BadRequestJSONResponse Error
+
+type ConflictJSONResponse Error
 
 type NotFoundJSONResponse Error
 
@@ -1866,6 +2179,105 @@ func (response EjectUsb404JSONResponse) VisitEjectUsbResponse(w http.ResponseWri
 	return err
 }
 
+type ListUsbFilesRequestObject struct {
+	Params ListUsbFilesParams
+}
+
+type ListUsbFilesResponseObject interface {
+	VisitListUsbFilesResponse(w http.ResponseWriter) error
+}
+
+type ListUsbFiles200JSONResponse UsbFileList
+
+func (response ListUsbFiles200JSONResponse) VisitListUsbFilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsbFiles400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListUsbFiles400JSONResponse) VisitListUsbFilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsbFiles404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListUsbFiles404JSONResponse) VisitListUsbFilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsbFiles409JSONResponse struct{ ConflictJSONResponse }
+
+func (response ListUsbFiles409JSONResponse) VisitListUsbFilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsbFileLocationsRequestObject struct {
+}
+
+type ListUsbFileLocationsResponseObject interface {
+	VisitListUsbFileLocationsResponse(w http.ResponseWriter) error
+}
+
+type ListUsbFileLocations200JSONResponse UsbFileLocations
+
+func (response ListUsbFileLocations200JSONResponse) VisitListUsbFileLocationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsbFileLocations404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListUsbFileLocations404JSONResponse) VisitListUsbFileLocationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ReleaseUsbRequestObject struct {
 	Body *ReleaseUsbJSONRequestBody
 }
@@ -1951,6 +2363,135 @@ func (response GetUsbStatus404JSONResponse) VisitGetUsbStatusResponse(w http.Res
 	return err
 }
 
+type ListUsbTransfersRequestObject struct {
+}
+
+type ListUsbTransfersResponseObject interface {
+	VisitListUsbTransfersResponse(w http.ResponseWriter) error
+}
+
+type ListUsbTransfers200JSONResponse UsbTransferList
+
+func (response ListUsbTransfers200JSONResponse) VisitListUsbTransfersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsbTransfers404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListUsbTransfers404JSONResponse) VisitListUsbTransfersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartUsbTransferRequestObject struct {
+	Body *StartUsbTransferJSONRequestBody
+}
+
+type StartUsbTransferResponseObject interface {
+	VisitStartUsbTransferResponse(w http.ResponseWriter) error
+}
+
+type StartUsbTransfer202JSONResponse UsbTransferJob
+
+func (response StartUsbTransfer202JSONResponse) VisitStartUsbTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartUsbTransfer400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response StartUsbTransfer400JSONResponse) VisitStartUsbTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartUsbTransfer404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response StartUsbTransfer404JSONResponse) VisitStartUsbTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartUsbTransfer409JSONResponse struct{ ConflictJSONResponse }
+
+func (response StartUsbTransfer409JSONResponse) VisitStartUsbTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelUsbTransferRequestObject struct {
+	Id int `json:"id"`
+}
+
+type CancelUsbTransferResponseObject interface {
+	VisitCancelUsbTransferResponse(w http.ResponseWriter) error
+}
+
+type CancelUsbTransfer204Response struct {
+}
+
+func (response CancelUsbTransfer204Response) VisitCancelUsbTransferResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type CancelUsbTransfer404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CancelUsbTransfer404JSONResponse) VisitCancelUsbTransferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// RunClipboardTest 클립보드 카나리아 테스트 (macOS)
@@ -1998,12 +2539,27 @@ type StrictServerInterface interface {
 	// EjectUsb 외장 디스크 꺼내기 (force=true 이면 열린 파일을 무시하고 강제 언마운트)
 	// (POST /usb/eject)
 	EjectUsb(ctx context.Context, request EjectUsbRequestObject) (EjectUsbResponseObject, error)
+	// ListUsbFiles 위치의 폴더 내용
+	// (GET /usb/files)
+	ListUsbFiles(ctx context.Context, request ListUsbFilesRequestObject) (ListUsbFilesResponseObject, error)
+	// ListUsbFileLocations 파일 전송에 쓸 수 있는 위치 (PC 폴더, 마운트된 USB 디스크, 휴대폰 MTP 저장소)
+	// (GET /usb/files/locations)
+	ListUsbFileLocations(ctx context.Context, request ListUsbFileLocationsRequestObject) (ListUsbFileLocationsResponseObject, error)
 	// ReleaseUsb USB 디스크/장치를 점유한 프로세스 종료 (선택 시 이어서 꺼내기)
 	// (POST /usb/release)
 	ReleaseUsb(ctx context.Context, request ReleaseUsbRequestObject) (ReleaseUsbResponseObject, error)
 	// GetUsbStatus USB 장치·외장 디스크와 사용 중인 프로세스
 	// (GET /usb/status)
 	GetUsbStatus(ctx context.Context, request GetUsbStatusRequestObject) (GetUsbStatusResponseObject, error)
+	// ListUsbTransfers 최근 파일 전송 작업 (최신순, 최대 20개)
+	// (GET /usb/transfers)
+	ListUsbTransfers(ctx context.Context, request ListUsbTransfersRequestObject) (ListUsbTransfersResponseObject, error)
+	// StartUsbTransfer 파일 복사/이동 시작 (백그라운드 작업, 한 번에 하나)
+	// (POST /usb/transfers)
+	StartUsbTransfer(ctx context.Context, request StartUsbTransferRequestObject) (StartUsbTransferResponseObject, error)
+	// CancelUsbTransfer 진행 중인 전송 취소 (전송 중이던 파일은 지워지고, 끝난 파일은 그대로)
+	// (POST /usb/transfers/{id}/cancel)
+	CancelUsbTransfer(ctx context.Context, request CancelUsbTransferRequestObject) (CancelUsbTransferResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2431,6 +2987,56 @@ func (sh *strictHandler) EjectUsb(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListUsbFiles operation middleware
+func (sh *strictHandler) ListUsbFiles(w http.ResponseWriter, r *http.Request, params ListUsbFilesParams) {
+	var request ListUsbFilesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUsbFiles(ctx, request.(ListUsbFilesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUsbFiles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUsbFilesResponseObject); ok {
+		if err := validResponse.VisitListUsbFilesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUsbFileLocations operation middleware
+func (sh *strictHandler) ListUsbFileLocations(w http.ResponseWriter, r *http.Request) {
+	var request ListUsbFileLocationsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUsbFileLocations(ctx, request.(ListUsbFileLocationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUsbFileLocations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUsbFileLocationsResponseObject); ok {
+		if err := validResponse.VisitListUsbFileLocationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ReleaseUsb operation middleware
 func (sh *strictHandler) ReleaseUsb(w http.ResponseWriter, r *http.Request) {
 	var request ReleaseUsbRequestObject
@@ -2479,6 +3085,87 @@ func (sh *strictHandler) GetUsbStatus(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetUsbStatusResponseObject); ok {
 		if err := validResponse.VisitGetUsbStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUsbTransfers operation middleware
+func (sh *strictHandler) ListUsbTransfers(w http.ResponseWriter, r *http.Request) {
+	var request ListUsbTransfersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUsbTransfers(ctx, request.(ListUsbTransfersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUsbTransfers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUsbTransfersResponseObject); ok {
+		if err := validResponse.VisitListUsbTransfersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartUsbTransfer operation middleware
+func (sh *strictHandler) StartUsbTransfer(w http.ResponseWriter, r *http.Request) {
+	var request StartUsbTransferRequestObject
+
+	var body StartUsbTransferJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartUsbTransfer(ctx, request.(StartUsbTransferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartUsbTransfer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartUsbTransferResponseObject); ok {
+		if err := validResponse.VisitStartUsbTransferResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelUsbTransfer operation middleware
+func (sh *strictHandler) CancelUsbTransfer(w http.ResponseWriter, r *http.Request, id int) {
+	var request CancelUsbTransferRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelUsbTransfer(ctx, request.(CancelUsbTransferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelUsbTransfer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelUsbTransferResponseObject); ok {
+		if err := validResponse.VisitCancelUsbTransferResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -37,7 +37,7 @@ make build                           # 빌드만 → build/detector
 | 네트워크 | 인터넷 연결·지연, 게이트웨이·DNS·프록시, 트래픽/지연/외부 연결 차트, 프로세스별 연결, **연결 목록**(연결 수 타일·프로세스 행 클릭 → 범위/상태/검색 필터), 네트워크 이벤트 |
 | 방화벽 | 방화벽 동작 여부, 구성요소별 설정·허용/차단 규칙·설정 파일, 방화벽 변경 이벤트 |
 | 녹화 감시 | 화면·마이크·카메라 사용 여부와 사용 중인 앱, 장치 상태, 녹화·원격 도구, 녹화 권한(허용 앱), 최근 사용 기록, 녹화 감시 이벤트 |
-| USB 감시 | 외장 디스크별 볼륨·쓰기량·**사용 중인 프로세스**와 **꺼내기 / 점유 종료 후 꺼내기 / 강제 꺼내기**, 프로세스별 종료·강제 종료, USB 장치 목록(종류·VID:PID·시리얼·장치를 연 프로세스), 연결·해제·조치 기록, USB 이벤트 |
+| USB 감시 | 외장 디스크별 볼륨·쓰기량·**사용 중인 프로세스**와 **꺼내기 / 점유 종료 후 꺼내기 / 강제 꺼내기**, 프로세스별 종료·강제 종료, USB 장치 목록(종류·VID:PID·시리얼·장치를 연 프로세스), 연결·해제·조치 기록, **파일 전송**(PC 폴더 ↔ USB 디스크 ↔ 휴대폰(MTP) mp3 등 복사·이동), USB 이벤트 |
 | 취약점 점검 | 취약한 보안 설정 등 취약점 이벤트 |
 | 전체 이벤트 | 모든 이벤트 |
 | 탐지기 상태 | 탐지기별 동작 상태 → 클릭하면 상세 (현재 점검 항목 · 실행 이력 · 탐지 이벤트), 클립보드 카나리아 테스트 |
@@ -63,6 +63,7 @@ detector/
 │   ├── handler/          API 핸들러
 │   ├── server/           라우팅 (/api/v1, /swagger/, /detector/)
 │   ├── swagger/          Swagger UI (바이너리에 포함)
+│   ├── usbfs/            파일 전송 (PC 폴더·USB 볼륨·MTP), usbfs/mtp: MTP 클라이언트 (macOS libusb+purego, Linux usbfs)
 │   ├── webui/            웹 UI 임베드 (빌드 시 web/dist 가 internal/webui/dist 로 복사됨)
 │   └── logger/           일자별 JSON 로그
 ├── web/                  React UI 소스
@@ -185,6 +186,21 @@ detector/
 - **이벤트**: 저장장치 연결(`usb.storage_connected`, 처음 보는 장치면 medium), 휴대폰·카메라 연결(`usb.mtp_connected`), 처음 보는 장치(`usb.new_device`), **처음 보는 키보드**(`usb.new_keyboard`, high — 키 입력을 주입하는 BadUSB 의심), **대량 쓰기**(`usb.bulk_write`, high — 10분간 `writeMB` 이상). 첫 실행 때 연결되어 있던 장치는 기준선으로 저장하고 보고하지 않습니다.
 - 늘 쓰는 장치는 `trustedDevices` 에 시리얼·`"vid:pid"`·제품 이름을 넣으면 이벤트에서 제외됩니다.
 
+### 파일 전송 (`[transfer]`)
+
+USB 감시 화면의 "파일 전송" 에서 두 위치를 나란히 열고 파일(기본: mp3만 보기)을 골라 반대쪽으로 **복사** 또는 **이동**합니다.
+
+- **위치**: `localDirs` 의 PC 폴더(기본 홈 `~` — sudo 로 실행하면 SUDO_USER 의 홈. `.ssh` 같은 숨김 파일·폴더는 열 수 없음), 마운트된 USB 디스크 볼륨, **휴대폰·카메라(MTP/PTP)** 저장소(내부 저장소, SD 카드 — 선택하면 `Music` 폴더가 있으면 그 폴더로 바로 열림). 설정한 폴더와 디스크 밖의 경로는 열 수 없습니다.
+- **폴더**도 선택할 수 있습니다: 하위 폴더까지 통째로 복사하고, 받을 곳에 같은 이름의 폴더가 있으면 합칩니다. "mp3만 보기" 가 켜져 있으면 폴더 안에서도 mp3만 복사하고 mp3가 없는 하위 폴더는 만들지 않습니다.
+- **이동** = 복사 후 원본 삭제(파일마다). 원본 폴더는 **비게 되었을 때만** 삭제합니다 (`.DS_Store` 같은 OS 찌꺼기는 무시, 걸러진 파일·숨김 파일·실패한 파일이 남아 있으면 그대로 둠). 같은 이름의 파일이 있으면 "덮어쓰기" 를 켰을 때만 덮어씁니다. 전송은 한 번에 하나이며 진행률·취소·파일별 실패 사유를 보여줍니다.
+- 디스크에는 임시 파일(`.이름.part`)로 쓰고 `fsync` 후 이름을 바꿉니다 → 중간에 실패해도 깨진 파일이 남지 않음. sudo 로 실행 중이면 PC 폴더에 쓴 파일의 소유자를 실행한 사용자로 돌려줍니다.
+- 전송은 `usb.action` 이벤트와 최근 기록(`파일 전송`)에 남고, detector 자신이 쓴 양은 **대량 쓰기(`usb.bulk_write`) 계산에서 제외**합니다.
+- **휴대폰(MTP)**: 화면 잠금을 풀고 USB 사용 모드를 **"파일 전송"** 으로 선택해야 저장소가 보입니다.
+  - macOS 는 MTP 를 기본 지원하지 않으므로 **libusb 가 필요**합니다: `brew install libusb` (빌드는 그대로 cgo 없이, 실행 시 purego 로 불러옴). 없으면 화면에 안내가 표시됩니다.
+  - Linux 는 usbfs(`/dev/bus/usb`)를 직접 사용합니다. root 가 아니면 udev 규칙(예: `android-udev-rules`)이 필요합니다.
+  - Android File Transfer, OpenMTP, gvfs-mtp, WebUSB 를 쓰는 브라우저 탭 등이 장치를 잡고 있으면 열 수 없습니다 → USB 장치 목록의 **모두 종료** 로 점유 프로그램을 종료한 뒤 다시 시도합니다.
+- 서버는 인증 없이 모든 인터페이스(`:apiPort`)에서 받으므로, 같은 네트워크에서 접속 가능한 환경이면 `localDirs` 를 최소한으로 두거나 `enabled = false` 로 끄세요.
+
 ### 화면 녹화·녹음·촬영 감시 (`[detect.recording]`)
 
 - **macOS — 사용 중인 앱**: 메뉴 막대의 화면 기록(보라색)·마이크(주황색)·카메라(초록색) 표시등과 같은 정보를 ControlCenter 의 `sensor-indicators` 로그에서 실시간(`log stream`)으로 받습니다. 기동 시 최근 1시간 로그로 현재 상태를 복원하고, 수집 주기(`interval`, 기본 10초) 사이에 끝난 짧은 캡처(스크린샷 등)도 한 번은 보고합니다.
@@ -247,6 +263,11 @@ Swagger UI: `http://localhost:<apiPort>/swagger/` — 스펙은 `api/openapi.yam
 | GET | `/api/v1/usb/status` | USB 장치, 외장 디스크·볼륨·쓰기량, 사용 중인 프로세스, 연결·조치 기록 |
 | POST | `/api/v1/usb/release` | 디스크/장치를 점유한 프로세스 종료 `{"target":"disk4","signal":"term\|kill","pids":[..],"eject":true}` |
 | POST | `/api/v1/usb/eject` | 디스크 꺼내기 `{"disk":"disk4","force":false}` (`force` = 열린 파일 무시하고 강제 언마운트) |
+| GET | `/api/v1/usb/files/locations` | 파일 전송 위치 (PC 폴더, USB 볼륨, MTP 저장소) |
+| GET | `/api/v1/usb/files` | 폴더 내용 `?location=mtp:mtp-1-5:00010001&dir=<폴더 id>&ext=mp3` |
+| GET | `/api/v1/usb/transfers` | 최근 전송 작업과 진행률 |
+| POST | `/api/v1/usb/transfers` | 복사/이동 시작 `{"from":"pc:0","fromDir":"","items":["a.mp3"],"to":"mtp:...","toDir":"<폴더 id>","move":true,"overwrite":false}` |
+| POST | `/api/v1/usb/transfers/{id}/cancel` | 전송 취소 |
 | GET | `/api/v1/metrics` | 시계열 지표 (`names=cpu.usage,mem.used_pct,...`, `range=1h\|6h\|24h\|7d`) |
 
 시계열 지표 이름: `cpu.usage`, `cpu.load1`, `mem.used_pct`, `mem.swap_used`, `disk.used_pct`, `net.rx_bps`, `net.tx_bps`, `net.established`, `net.external`, `net.latency_ms`
@@ -292,5 +313,6 @@ make dev-web    # 터미널 2: Vite 개발 서버 (핫 리로드) → http://loc
 | 탐지 기록/기준선이 사라짐 | 루트가 아닌 곳에서 실행해 새 DB 가 생김 → 루트에서 실행 |
 | 녹화 감시 "TCC.db 읽기 불가" | 전체 디스크 접근 권한 필요 → 시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한에 detector(또는 실행한 터미널) 추가 후 재시작 |
 | USB 감시에서 점유 프로세스가 안 보이거나 "권한 없음" 으로 종료 실패 | 다른 사용자·시스템 프로세스는 root 필요 → `sudo ./build/detector -c config.toml` |
+| 파일 전송에 휴대폰이 안 보임 | macOS: `brew install libusb` 후 재시작 · 휴대폰 잠금 해제 + USB 모드 "파일 전송" · 다른 MTP 앱 종료 (USB 감시 → 모두 종료) |
 | 클립보드 탐지기 경고 "root 로 실행 중" | 클립보드는 로그인 사용자 세션에 속함 → 사용자 권한으로 실행 |
 | 일부 파일이 "읽기 불가" | 권한 부족 → root 로 실행하면 내용까지 비교 |

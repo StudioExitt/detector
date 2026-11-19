@@ -66,6 +66,13 @@ interval = "10s"
 writeMB = 500              # 한 외장 디스크에 10분간 이만큼 쓰면 대량 복사로 탐지
 # trustedDevices = ["0781:5583", "4C530001230811116043"]   # 이벤트 제외 (시리얼 번호, "vid:pid" 16진수, 제품 이름)
 
+# 파일 전송: PC 폴더 ↔ USB 디스크 ↔ 휴대폰(MTP) 복사/이동 (웹 "USB 감시" → 파일 전송)
+#  - 휴대폰(MTP)은 macOS 에서 libusb 필요: brew install libusb
+#  - 인증 없는 API 이므로 외부에서 접속 가능한 환경이면 폴더를 최소로 두거나 끄세요
+[transfer]
+enabled = true
+localDirs = ["~"]          # 웹에서 열 수 있는 PC 폴더 (~ = 실행 사용자, sudo 면 SUDO_USER 의 홈). 숨김 파일·폴더(.ssh 등)는 열 수 없음
+
 # 시스템 자원: CPU/메모리/디스크 이상징후 (웹 "시스템")
 [detect.resources]
 interval = "30s"

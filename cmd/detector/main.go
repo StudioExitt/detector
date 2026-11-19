@@ -20,6 +20,7 @@ import (
 	"detector/internal/handler"
 	"detector/internal/logger"
 	"detector/internal/server"
+	"detector/internal/usbfs"
 	"detector/internal/webui"
 )
 
@@ -87,9 +88,19 @@ func run() error {
 		dm.Run(ctx)
 	}()
 
+	var files *usbfs.Service
+	if cfg.Transfer.IsEnabled() {
+		files = usbfs.New(cfg.Transfer, usbfs.Deps{
+			Volumes:   func() []usbfs.Volume { return usbVolumes(dm) },
+			SelfWrite: detect.NoteUsbSelfWrite,
+			Record:    dm.UsbTransferred,
+			Log:       log.With("component", "transfer"),
+		})
+	}
+
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Common.APIPort),
-		Handler:           server.NewHandler(handler.New(database, loc, version, dm), log),
+		Handler:           server.NewHandler(handler.New(database, loc, version, dm, files), log),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -143,6 +154,26 @@ func run() error {
 	}
 	log.Info("server stopped")
 	return nil
+}
+
+// usbVolumes: mounted volumes of external disks from the usb detector.
+func usbVolumes(dm *detect.Manager) []usbfs.Volume {
+	v, _ := dm.Snapshot("usb")
+	snap, ok := v.(detect.UsbSnapshot)
+	if !ok {
+		return nil
+	}
+	var out []usbfs.Volume
+	for _, k := range snap.Disks {
+		for _, vol := range k.Volumes {
+			if vol.MountPoint == "" {
+				continue
+			}
+			out = append(out, usbfs.Volume{ID: vol.ID, Disk: k.Disk, Name: vol.Name, Device: k.Name, MountPoint: vol.MountPoint,
+				Size: int64(vol.Size), Free: int64(vol.Free), ReadOnly: vol.ReadOnly})
+		}
+	}
+	return out
 }
 
 func openURL(u string) {

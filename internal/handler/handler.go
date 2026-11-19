@@ -10,6 +10,7 @@ import (
 
 	"detector/api"
 	"detector/internal/detect"
+	"detector/internal/usbfs"
 )
 
 var _ api.StrictServerInterface = (*Handler)(nil)
@@ -19,10 +20,11 @@ type Handler struct {
 	loc     *time.Location
 	version string
 	detect  *detect.Manager
+	files   *usbfs.Service // nil when transfer is disabled
 }
 
-func New(db *sql.DB, loc *time.Location, version string, dm *detect.Manager) *Handler {
-	return &Handler{db: db, loc: loc, version: version, detect: dm}
+func New(db *sql.DB, loc *time.Location, version string, dm *detect.Manager, files *usbfs.Service) *Handler {
+	return &Handler{db: db, loc: loc, version: version, detect: dm, files: files}
 }
 
 func (h *Handler) ListDetectors(_ context.Context, _ api.ListDetectorsRequestObject) (api.ListDetectorsResponseObject, error) {

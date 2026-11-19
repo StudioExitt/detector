@@ -8,6 +8,7 @@ import { bytes, duration, rate } from '../lib/format'
 import { useFetch } from '../lib/useFetch'
 import { useInterval } from '../lib/useInterval'
 import EventsPage from './EventsPage'
+import UsbTransfer from './UsbTransfer'
 
 const th = 'px-3 py-2 font-medium'
 const tableHead = 'border-b border-slate-200 text-left text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400'
@@ -113,6 +114,8 @@ export default function UsbPage() {
       {data?.disks.map((k) => (
         <DiskCard key={k.disk} k={k} device={data.devices.find((d) => d.id === k.deviceId)} busy={busy} run={run} />
       ))}
+
+      <UsbTransfer />
 
       {data && (
         <Card

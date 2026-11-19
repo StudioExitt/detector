@@ -22,7 +22,19 @@ type Config struct {
 	Log      LogConfig      `toml:"log"`
 	Database DatabaseConfig `toml:"database"`
 	Detect   DetectConfig   `toml:"detect"`
+	Transfer TransferConfig `toml:"transfer"`
 }
+
+// TransferConfig: copying / moving files between this PC, USB disks and
+// phones (MTP) from the web UI.
+type TransferConfig struct {
+	Enabled *bool `toml:"enabled"`
+	// PC folders offered in the web UI ("~" = home of the user running the
+	// server, or of SUDO_USER under sudo). Nothing outside them is reachable.
+	LocalDirs []string `toml:"localDirs"`
+}
+
+func (t TransferConfig) IsEnabled() bool { return t.Enabled == nil || *t.Enabled }
 
 type CommonConfig struct {
 	APIPort  int    `toml:"apiPort"`
@@ -181,6 +193,10 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Database.FilePath == "" {
 		c.Database.FilePath = DefaultDBPath
+	}
+
+	if c.Transfer.LocalDirs == nil {
+		c.Transfer.LocalDirs = []string{"~"}
 	}
 
 	d := &c.Detect

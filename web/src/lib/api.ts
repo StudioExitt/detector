@@ -218,7 +218,7 @@ export type UsbDisk = {
   trusted: boolean
 }
 
-export type UsbActivity = { at: string; kind: 'connect' | 'disconnect' | 'eject' | 'force_eject' | 'kill' | string; target: string; detail: string; ok: boolean }
+export type UsbActivity = { at: string; kind: 'connect' | 'disconnect' | 'eject' | 'force_eject' | 'kill' | 'transfer' | string; target: string; detail: string; ok: boolean }
 
 export type UsbStatus = { at: string; platform: string; root: boolean; devices: UsbDevice[]; disks: UsbDisk[]; recent: UsbActivity[]; notes: string[] }
 
@@ -227,6 +227,55 @@ export type UsbStep = { action: string; target: string; ok: boolean; detail: str
 export type UsbActionResult = { ok: boolean; steps: UsbStep[] }
 
 export type UsbReleaseRequest = { target: string; pids?: number[]; signal?: 'term' | 'kill'; eject?: boolean }
+
+export type UsbFileLocation = {
+  id: string
+  kind: 'pc' | 'volume' | 'mtp'
+  name: string
+  detail: string
+  size: number
+  free: number
+  readOnly: boolean
+  error?: string
+}
+
+export type UsbFileLocations = { locations: UsbFileLocation[]; notes: string[] }
+
+export type UsbFileEntry = { id: string; name: string; dir: boolean; size: number; modified?: string }
+
+export type UsbFileList = { location: UsbFileLocation; dir: string; entries: UsbFileEntry[] }
+
+export type UsbTransferRequest = {
+  from: string
+  fromDir?: string
+  items: string[]
+  to: string
+  toDir?: string
+  move?: boolean
+  overwrite?: boolean
+  ext?: string
+}
+
+export type UsbTransferJob = {
+  id: number
+  from: string
+  to: string
+  fromName: string
+  toName: string
+  move: boolean
+  state: 'running' | 'done' | 'failed' | 'canceled'
+  files: number
+  folders: number
+  done: number
+  failed: number
+  skipped: number
+  bytes: number
+  bytesDone: number
+  current: string
+  startedAt: string
+  finishedAt?: string
+  results: { name: string; ok: boolean; error?: string }[]
+}
 
 export type EventList = { items: DetectEvent[]; total: number }
 
@@ -277,6 +326,12 @@ export const api = {
   usbStatus: (signal?: AbortSignal) => request<UsbStatus>('/usb/status', { signal }),
   usbRelease: (body: UsbReleaseRequest) => request<UsbActionResult>('/usb/release', { method: 'POST', body: JSON.stringify(body) }),
   usbEject: (disk: string, force = false) => request<UsbActionResult>('/usb/eject', { method: 'POST', body: JSON.stringify({ disk, force }) }),
+  usbFileLocations: (signal?: AbortSignal) => request<UsbFileLocations>('/usb/files/locations', { signal }),
+  usbFiles: (location: string, dir: string, ext: string, signal?: AbortSignal) =>
+    request<UsbFileList>(`/usb/files${query({ location, dir, ext })}`, { signal }),
+  usbTransfers: (signal?: AbortSignal) => request<{ items: UsbTransferJob[] }>('/usb/transfers', { signal }),
+  usbTransferStart: (body: UsbTransferRequest) => request<UsbTransferJob>('/usb/transfers', { method: 'POST', body: JSON.stringify(body) }),
+  usbTransferCancel: (id: number) => request<void>(`/usb/transfers/${id}/cancel`, { method: 'POST' }),
   metrics: (names: string[], range: MetricRange, signal?: AbortSignal) =>
     request<MetricSeriesList>(`/metrics${query({ names: names.join(','), range })}`, { signal }),
   clipboardTest: () => request<ClipboardTestResult>('/clipboard/test', { method: 'POST' }),

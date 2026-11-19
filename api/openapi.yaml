@@ -235,6 +235,110 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /usb/files/locations:
+    get:
+      tags: [system]
+      operationId: listUsbFileLocations
+      summary: 파일 전송에 쓸 수 있는 위치 (PC 폴더, 마운트된 USB 디스크, 휴대폰 MTP 저장소)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsbFileLocations"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /usb/files:
+    get:
+      tags: [system]
+      operationId: listUsbFiles
+      summary: 위치의 폴더 내용
+      parameters:
+        - name: location
+          in: query
+          required: true
+          schema: {type: string}
+          description: "위치 ID (pc:0 / vol:disk4s1 / mtp:mtp-1-5:00010001)"
+        - name: dir
+          in: query
+          schema: {type: string}
+          description: "폴더 ID (생략하면 최상위). 목록 항목의 id 를 그대로 사용"
+        - name: ext
+          in: query
+          schema: {type: string}
+          description: "확장자 필터, 쉼표로 구분 (예: mp3,m4a). 폴더는 항상 포함"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsbFileList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /usb/transfers:
+    get:
+      tags: [system]
+      operationId: listUsbTransfers
+      summary: 최근 파일 전송 작업 (최신순, 최대 20개)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsbTransferList"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [system]
+      operationId: startUsbTransfer
+      summary: 파일 복사/이동 시작 (백그라운드 작업, 한 번에 하나)
+      description: |
+        from 위치의 fromDir 폴더에서 items(파일 또는 폴더 id)를 to 위치의 toDir 폴더로 복사합니다. 폴더는 하위 폴더까지 통째로 복사하며,
+        받을 곳에 같은 이름의 폴더가 있으면 합칩니다. ext 를 주면 폴더 안의 파일은 그 확장자만 복사하고, 해당 파일이 없는 하위 폴더는 만들지 않습니다.
+        move=true 이면 파일마다 복사 후 원본을 삭제하고, 비게 된 원본 폴더도 삭제합니다 (남은 파일이 있으면 폴더는 그대로).
+        같은 이름의 파일이 있으면 overwrite=true 일 때만 덮어씁니다.
+        진행 상황은 GET /usb/transfers 로 확인합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsbTransferRequest"
+      responses:
+        "202":
+          description: 시작됨
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsbTransferJob"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /usb/transfers/{id}/cancel:
+    post:
+      tags: [system]
+      operationId: cancelUsbTransfer
+      summary: 진행 중인 전송 취소 (전송 중이던 파일은 지워지고, 끝난 파일은 그대로)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        "204":
+          description: 취소 요청됨
+        "404":
+          $ref: "#/components/responses/NotFound"
   /metrics:
     get:
       tags: [system]
@@ -346,6 +450,12 @@ components:
             $ref: "#/components/schemas/Error"
     BadRequest:
       description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: 다른 작업이 장치를 사용 중
       content:
         application/json:
           schema:
@@ -894,7 +1004,7 @@ components:
       required: [at, kind, target, detail, ok]
       properties:
         at: {type: string, format: date-time}
-        kind: {type: string, description: "connect / disconnect / eject / force_eject / kill"}
+        kind: {type: string, description: "connect / disconnect / eject / force_eject / kill / transfer"}
         target: {type: string}
         detail: {type: string}
         ok: {type: boolean}
@@ -950,6 +1060,96 @@ components:
         steps:
           type: array
           items: {$ref: "#/components/schemas/UsbStep"}
+    UsbFileLocation:
+      type: object
+      required: [id, kind, name, detail, size, free, readOnly]
+      properties:
+        id: {type: string, description: "pc:<n> / vol:<볼륨 ID> / mtp:<장치 ID>:<저장소 ID>"}
+        kind: {type: string, enum: [pc, volume, mtp]}
+        name: {type: string}
+        detail: {type: string}
+        size: {type: integer, format: int64}
+        free: {type: integer, format: int64}
+        readOnly: {type: boolean}
+        error: {type: string, description: "지금 사용할 수 없는 이유 (휴대폰 잠김, 다른 앱이 사용 중 등)"}
+    UsbFileLocations:
+      type: object
+      required: [locations, notes]
+      properties:
+        locations:
+          type: array
+          items: {$ref: "#/components/schemas/UsbFileLocation"}
+        notes:
+          type: array
+          items: {type: string}
+    UsbFileEntry:
+      type: object
+      required: [id, name, dir, size]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        dir: {type: boolean}
+        size: {type: integer, format: int64}
+        modified: {type: string, format: date-time}
+    UsbFileList:
+      type: object
+      required: [location, dir, entries]
+      properties:
+        location: {$ref: "#/components/schemas/UsbFileLocation"}
+        dir: {type: string}
+        entries:
+          type: array
+          items: {$ref: "#/components/schemas/UsbFileEntry"}
+    UsbTransferRequest:
+      type: object
+      required: [from, items, to]
+      properties:
+        from: {type: string}
+        fromDir: {type: string}
+        items: {type: array, items: {type: string}, description: "fromDir 안의 파일·폴더 id"}
+        to: {type: string}
+        toDir: {type: string}
+        move: {type: boolean, description: "복사 후 원본 삭제"}
+        overwrite: {type: boolean}
+        ext: {type: string, description: "선택한 폴더 안에서 복사할 확장자, 쉼표로 구분 (예: mp3). 생략하면 전부"}
+    UsbTransferFile:
+      type: object
+      required: [name, ok]
+      properties:
+        name: {type: string}
+        ok: {type: boolean}
+        error: {type: string}
+    UsbTransferJob:
+      type: object
+      required: [id, from, to, fromName, toName, move, state, files, folders, done, failed, skipped, bytes, bytesDone, current, startedAt, results]
+      properties:
+        id: {type: integer}
+        from: {type: string}
+        to: {type: string}
+        fromName: {type: string}
+        toName: {type: string}
+        move: {type: boolean}
+        state: {type: string, enum: [running, done, failed, canceled]}
+        files: {type: integer, description: "복사할 파일 수 (폴더 내용 확인이 끝나면 정해짐)"}
+        folders: {type: integer, description: "받을 곳에 만든(또는 합친) 폴더 수"}
+        done: {type: integer}
+        failed: {type: integer}
+        skipped: {type: integer, description: "찾을 수 없었던 항목"}
+        bytes: {type: integer, format: int64}
+        bytesDone: {type: integer, format: int64}
+        current: {type: string}
+        startedAt: {type: string, format: date-time}
+        finishedAt: {type: string, format: date-time}
+        results:
+          type: array
+          items: {$ref: "#/components/schemas/UsbTransferFile"}
+    UsbTransferList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/UsbTransferJob"}
     MetricPoint:
       type: object
       required: [t, v]
