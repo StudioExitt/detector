@@ -58,6 +58,7 @@ type DetectConfig struct {
 	Posture   DetectorConfig        `toml:"posture"`
 	Firewall  DetectorConfig        `toml:"firewall"`
 	Recording RecordingDetectConfig `toml:"recording"`
+	USB       UsbDetectConfig       `toml:"usb"`
 	Resources ResourcesDetectConfig `toml:"resources"`
 	Network   NetworkDetectConfig   `toml:"network"`
 	// macOS only
@@ -93,6 +94,14 @@ type RecordingDetectConfig struct {
 	DetectorConfig
 	// bundle ids, process names or exe paths that may capture without an event
 	TrustedApps []string `toml:"trustedApps"`
+}
+
+// UsbDetectConfig: USB devices, external disks and who is using them.
+type UsbDetectConfig struct {
+	DetectorConfig
+	WriteMB float64 `toml:"writeMB"` // bytes written to one external disk within 10 minutes; 0 = default
+	// serial numbers, "vid:pid" (hex, e.g. "0781:5583") or product names that never raise events
+	TrustedDevices []string `toml:"trustedDevices"`
 }
 
 type ExtensionsDetectConfig struct {
@@ -193,6 +202,8 @@ func (c *Config) applyDefaults() {
 		// the screenshot UI (⌘⇧3/4/5) is started by the user
 		d.Recording.TrustedApps = []string{"com.apple.systemuiserver", "com.apple.screencaptureui"}
 	}
+	setInterval(&d.USB.DetectorConfig, 10*time.Second)
+	d.USB.WriteMB = orDefault(d.USB.WriteMB, 500)
 	setInterval(&d.Resources.DetectorConfig, 30*time.Second)
 	setInterval(&d.Network.DetectorConfig, 30*time.Second)
 	r := &d.Resources
@@ -272,6 +283,7 @@ func (c *Config) validate() error {
 		"clipboard": c.Detect.Clipboard.Interval, "extensions": c.Detect.Extensions.Interval,
 		"resources": c.Detect.Resources.Interval, "network": c.Detect.Network.Interval,
 		"firewall": c.Detect.Firewall.Interval, "recording": c.Detect.Recording.Interval,
+		"usb": c.Detect.USB.Interval,
 	} {
 		if iv < 5*time.Second {
 			return fmt.Errorf("detect.%s.interval must be >= 5s, got %s", name, iv)

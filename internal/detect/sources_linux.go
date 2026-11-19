@@ -22,5 +22,12 @@ func detectorSources(name string) []string {
 			"/proc/<pid>/fd → /dev/video* (카메라를 연 프로세스)",
 			"/proc: 화면/오디오 녹화 도구, 원격 화면 보기·제어 도구 (화면 캡처 자체는 OS 가 알려주지 않음)",
 		},
+		"usb": {
+			"/sys/bus/usb/devices: USB 장치(제조사·제품·시리얼·VID:PID), 인터페이스 종류",
+			"/sys/block/<dev> (USB 경로), stat: 외장 디스크와 읽기/쓰기 섹터",
+			"/proc/self/mountinfo, /dev/disk/by-label: 마운트 위치·파일시스템·라벨",
+			"/proc/<pid>/fd, cwd, root, exe: 디스크·/dev/bus/usb 장치를 사용 중인 프로세스",
+			"조치: kill(SIGTERM→SIGKILL), udisksctl unmount/power-off (없으면 umount/eject), umount -f / -l",
+		},
 	}[name]
 }

@@ -180,6 +180,7 @@ func buildDetectors(cfg config.DetectConfig) []registered {
 	add(cfg.Posture, newPostureDetector())
 	add(cfg.Firewall, newFirewallDetector())
 	add(cfg.Recording.DetectorConfig, newRecordingDetector(cfg.Recording))
+	add(cfg.USB.DetectorConfig, newUsbDetector(cfg.USB))
 	add(cfg.Resources.DetectorConfig, newResourcesDetector(cfg.Resources))
 	add(cfg.Network.DetectorConfig, newNetworkDetector(cfg.Network))
 	add(cfg.Clipboard.DetectorConfig, newClipboardDetector(cfg.Clipboard))
@@ -366,6 +367,47 @@ func (m *Manager) CanaryTest(ctx context.Context) (CanaryResult, error) {
 		return res, nil
 	}
 	return CanaryResult{}, ErrUnavailable
+}
+
+// UsbRelease terminates the processes occupying a USB disk / device
+// (optionally only pids; hard escalates to SIGKILL) and optionally ejects it.
+func (m *Manager) UsbRelease(ctx context.Context, target string, pids []int, hard, eject bool) (UsbActionResult, error) {
+	return m.usbAction(ctx, func(a usbActor) (UsbActionResult, []Finding, error) {
+		return a.UsbRelease(ctx, target, pids, hard, eject)
+	})
+}
+
+// UsbEject ejects an external disk; force unmounts even with open files.
+func (m *Manager) UsbEject(ctx context.Context, disk string, force bool) (UsbActionResult, error) {
+	return m.usbAction(ctx, func(a usbActor) (UsbActionResult, []Finding, error) {
+		return a.UsbEject(ctx, disk, force)
+	})
+}
+
+func (m *Manager) usbAction(ctx context.Context, fn func(usbActor) (UsbActionResult, []Finding, error)) (UsbActionResult, error) {
+	for _, e := range m.entries {
+		a, ok := e.det.(usbActor)
+		if !ok {
+			continue
+		}
+		res, findings, err := fn(a)
+		if err != nil {
+			return res, err
+		}
+		for _, f := range findings {
+			if stored, err := m.emit(ctx, e.det.Name(), f); err != nil {
+				m.log.Error("store finding failed", "rule", f.Rule, "err", err)
+			} else if stored {
+				e.mu.Lock()
+				e.status.Findings++
+				e.mu.Unlock()
+			}
+		}
+		// refresh the snapshot right away so the UI shows the new state
+		go m.runOnce(context.WithoutCancel(ctx), e, &Env{State: &State{db: m.db, detector: e.det.Name()}, Log: m.log.With("detector", e.det.Name()), Host: m.host})
+		return res, nil
+	}
+	return UsbActionResult{}, ErrUnavailable
 }
 
 // Snapshot returns the latest structured state of a detector (nil if none yet).

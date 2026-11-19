@@ -58,6 +58,14 @@ interval = "1m"
 interval = "10s"
 # trustedApps = ["com.apple.systemuiserver", "com.apple.screencaptureui", "us.zoom.xos"]   # 이벤트 제외 (번들 ID·프로세스 이름·경로)
 
+# USB 감시: USB 장치·외장 디스크 연결, 사용 중인 프로세스, 대량 복사, 처음 보는 키보드(BadUSB) (웹 "USB 감시")
+#  - 웹에서 점유 프로세스 종료(SIGTERM/SIGKILL), 꺼내기, 강제 꺼내기 가능 (다른 사용자·시스템 프로세스는 root 필요)
+#  - macOS: ioreg + diskutil + lsof, Linux: sysfs + /proc + udisksctl(없으면 umount/eject)
+[detect.usb]
+interval = "10s"
+writeMB = 500              # 한 외장 디스크에 10분간 이만큼 쓰면 대량 복사로 탐지
+# trustedDevices = ["0781:5583", "4C530001230811116043"]   # 이벤트 제외 (시리얼 번호, "vid:pid" 16진수, 제품 이름)
+
 # 시스템 자원: CPU/메모리/디스크 이상징후 (웹 "시스템")
 [detect.resources]
 interval = "30s"

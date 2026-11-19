@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Activity, BrickWall, Gauge, LayoutDashboard, ListTree, Network, Radar, ScanSearch, Video, type LucideIcon } from 'lucide-react'
+import { Activity, BrickWall, Gauge, LayoutDashboard, ListTree, Network, Radar, ScanSearch, Usb, Video, type LucideIcon } from 'lucide-react'
 import type { MessageKey } from './i18n'
 import Dashboard from './pages/Dashboard'
 import DetectorsPage from './pages/DetectorsPage'
@@ -8,6 +8,7 @@ import FirewallPage from './pages/FirewallPage'
 import NetworkPage from './pages/NetworkPage'
 import RecordingPage from './pages/RecordingPage'
 import SystemPage from './pages/SystemPage'
+import UsbPage from './pages/UsbPage'
 
 export type MenuItem = {
   /** 라우트 경로 (VITE_APP_BASE_URL 기준 상대 경로) */
@@ -25,6 +26,7 @@ export const menus: MenuItem[] = [
   { path: '/network', labelKey: 'menu.network', icon: Network, element: <NetworkPage /> },
   { path: '/firewall', labelKey: 'menu.firewall', icon: BrickWall, element: <FirewallPage /> },
   { path: '/recording', labelKey: 'menu.recording', icon: Video, element: <RecordingPage /> },
+  { path: '/usb', labelKey: 'menu.usb', icon: Usb, element: <UsbPage /> },
   { path: '/vuln-scan', labelKey: 'menu.vulnScan', icon: ScanSearch, element: <EventsPage category="vulnerability_scan" /> },
   { path: '/events', labelKey: 'menu.events', icon: ListTree, element: <EventsPage /> },
   { path: '/detectors', labelKey: 'menu.detectors', icon: Radar, element: <DetectorsPage /> },

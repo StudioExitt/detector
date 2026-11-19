@@ -29,5 +29,11 @@ func detectorSources(name string) []string {
 			"TCC.db (시스템·사용자): 화면 기록·마이크·카메라·입력 모니터링 허용 앱 (전체 디스크 접근 권한 필요)",
 			"ps: 화면/오디오 녹화 도구, 원격 화면 보기·제어 도구",
 		},
+		"usb": {
+			"ioreg -r -c IOUSBHostDevice -a: USB 장치(제조사·제품·시리얼·VID:PID), 인터페이스 종류, 장치를 연 프로세스(IOUserClientCreator), 디스크 읽기/쓰기 바이트",
+			"diskutil list/info -plist external: 외장 디스크·볼륨·마운트 위치 (디스크 이미지 제외)",
+			"lsof -F (마운트 위치, /dev/diskN, /dev/rdiskN): 디스크를 사용 중인 프로세스",
+			"조치: kill(SIGTERM→SIGKILL), diskutil eject, diskutil unmountDisk force",
+		},
 	}[name]
 }

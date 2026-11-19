@@ -39,3 +39,7 @@ func OpenFirewallSettings(context.Context) error                   { return ErrU
 func collectFirewall(context.Context) ([]FirewallComponent, error) { return nil, errUnsupported }
 
 func newRecSource() recSource { return nil }
+
+func newUsbSource() usbSource                               { return nil }
+func usbEjectDisk(context.Context, UsbDisk, bool) []UsbStep { return nil }
+func killAndWait(int, bool) (bool, string)                  { return false, "not supported" }

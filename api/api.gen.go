@@ -86,6 +86,24 @@ func (e EventSeverity) Valid() bool {
 	}
 }
 
+// Defines values for UsbReleaseRequestSignal.
+const (
+	Kill UsbReleaseRequestSignal = "kill"
+	Term UsbReleaseRequestSignal = "term"
+)
+
+// Valid indicates whether the value is a known member of the UsbReleaseRequestSignal enum.
+func (e UsbReleaseRequestSignal) Valid() bool {
+	switch e {
+	case Kill:
+		return true
+	case Term:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetMetricsParamsRange.
 const (
 	N1h  GetMetricsParamsRange = "1h"
@@ -549,6 +567,138 @@ type SystemStatus struct {
 	TopMem []ProcUsage `json:"topMem"`
 }
 
+// UsbActionResult defines model for UsbActionResult.
+type UsbActionResult struct {
+	Ok    bool      `json:"ok"`
+	Steps []UsbStep `json:"steps"`
+}
+
+// UsbActivity defines model for UsbActivity.
+type UsbActivity struct {
+	At     time.Time `json:"at"`
+	Detail string    `json:"detail"`
+
+	// Kind connect / disconnect / eject / force_eject / kill
+	Kind   string `json:"kind"`
+	Ok     bool   `json:"ok"`
+	Target string `json:"target"`
+}
+
+// UsbDevice defines model for UsbDevice.
+type UsbDevice struct {
+	// Clients USB 장치 자체를 연 프로세스 (MTP 앱, libusb 등)
+	Clients []UsbProc `json:"clients"`
+	Disks   []string  `json:"disks"`
+	Id      string    `json:"id"`
+
+	// Kinds storage / mtp / keyboard / mouse / hid / network / serial / audio / video / other
+	Kinds []string `json:"kinds"`
+
+	// Known 이전에 연결된 적 있는 장치
+	Known     bool      `json:"known"`
+	Name      string    `json:"name"`
+	ProductId int       `json:"productId"`
+	Serial    string    `json:"serial"`
+	Since     time.Time `json:"since"`
+	Speed     string    `json:"speed"`
+	Trusted   bool      `json:"trusted"`
+	Vendor    string    `json:"vendor"`
+	VendorId  int       `json:"vendorId"`
+}
+
+// UsbDisk defines model for UsbDisk.
+type UsbDisk struct {
+	Bus        string      `json:"bus"`
+	DeviceId   string      `json:"deviceId"`
+	Disk       string      `json:"disk"`
+	Name       string      `json:"name"`
+	Occupants  []UsbProc   `json:"occupants"`
+	ReadBytes  int64       `json:"readBytes"`
+	Removable  bool        `json:"removable"`
+	Size       int64       `json:"size"`
+	StatsKnown bool        `json:"statsKnown"`
+	Trusted    bool        `json:"trusted"`
+	Volumes    []UsbVolume `json:"volumes"`
+	Write10m   int64       `json:"write10m"`
+	WriteBps   float64     `json:"writeBps"`
+	WriteBytes int64       `json:"writeBytes"`
+}
+
+// UsbEjectRequest defines model for UsbEjectRequest.
+type UsbEjectRequest struct {
+	Disk string `json:"disk"`
+
+	// Force 열린 파일을 무시하고 강제 언마운트 (쓰는 중인 데이터 손상 가능)
+	Force *bool `json:"force,omitempty"`
+}
+
+// UsbProc defines model for UsbProc.
+type UsbProc struct {
+	// Count 열린 파일 수
+	Count int    `json:"count"`
+	Exe   string `json:"exe"`
+
+	// Files 열린 경로 예시 (최대 5개)
+	Files []string `json:"files"`
+	Name  string   `json:"name"`
+	Pid   int      `json:"pid"`
+
+	// System Spotlight 색인 등 OS 서비스 (대개 무해)
+	System bool   `json:"system"`
+	User   string `json:"user"`
+}
+
+// UsbReleaseRequest defines model for UsbReleaseRequest.
+type UsbReleaseRequest struct {
+	// Eject 종료 후 디스크 꺼내기
+	Eject *bool `json:"eject,omitempty"`
+
+	// Pids 생략하면 점유 중인 모든 프로세스
+	Pids *[]int `json:"pids,omitempty"`
+
+	// Signal term: SIGTERM 만 / kill: SIGTERM 후 남으면 SIGKILL (기본 term)
+	Signal *UsbReleaseRequestSignal `json:"signal,omitempty"`
+
+	// Target 디스크 이름 (disk4 / sdb) 또는 장치 ID (usb-...)
+	Target string `json:"target"`
+}
+
+// UsbReleaseRequestSignal term: SIGTERM 만 / kill: SIGTERM 후 남으면 SIGKILL (기본 term)
+type UsbReleaseRequestSignal string
+
+// UsbStatus defines model for UsbStatus.
+type UsbStatus struct {
+	At       time.Time     `json:"at"`
+	Devices  []UsbDevice   `json:"devices"`
+	Disks    []UsbDisk     `json:"disks"`
+	Notes    []string      `json:"notes"`
+	Platform string        `json:"platform"`
+	Recent   []UsbActivity `json:"recent"`
+	Root     bool          `json:"root"`
+}
+
+// UsbStep defines model for UsbStep.
+type UsbStep struct {
+	// Action kill / unmount / force_unmount / eject / hint
+	Action string `json:"action"`
+	Detail string `json:"detail"`
+	Ok     bool   `json:"ok"`
+	Target string `json:"target"`
+}
+
+// UsbVolume defines model for UsbVolume.
+type UsbVolume struct {
+	Free int64  `json:"free"`
+	Fs   string `json:"fs"`
+	Id   string `json:"id"`
+
+	// MountPoint 빈 문자열이면 마운트 안 됨
+	MountPoint string `json:"mountPoint"`
+	Name       string `json:"name"`
+	ReadOnly   bool   `json:"readOnly"`
+	Size       int64  `json:"size"`
+}
+
 // DetectorName defines model for DetectorName.
 type DetectorName = string
 
@@ -584,6 +734,12 @@ type GetMetricsParamsRange string
 
 // CreateEventJSONRequestBody defines body for CreateEvent for application/json ContentType.
 type CreateEventJSONRequestBody = NewEvent
+
+// EjectUsbJSONRequestBody defines body for EjectUsb for application/json ContentType.
+type EjectUsbJSONRequestBody = UsbEjectRequest
+
+// ReleaseUsbJSONRequestBody defines body for ReleaseUsb for application/json ContentType.
+type ReleaseUsbJSONRequestBody = UsbReleaseRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -629,6 +785,15 @@ type ServerInterface interface {
 	// GetSystemStatus 현재 CPU/메모리/디스크/상위 프로세스
 	// (GET /system/status)
 	GetSystemStatus(w http.ResponseWriter, r *http.Request)
+	// EjectUsb 외장 디스크 꺼내기 (force=true 이면 열린 파일을 무시하고 강제 언마운트)
+	// (POST /usb/eject)
+	EjectUsb(w http.ResponseWriter, r *http.Request)
+	// ReleaseUsb USB 디스크/장치를 점유한 프로세스 종료 (선택 시 이어서 꺼내기)
+	// (POST /usb/release)
+	ReleaseUsb(w http.ResponseWriter, r *http.Request)
+	// GetUsbStatus USB 장치·외장 디스크와 사용 중인 프로세스
+	// (GET /usb/status)
+	GetUsbStatus(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1000,6 +1165,48 @@ func (siw *ServerInterfaceWrapper) GetSystemStatus(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// EjectUsb operation middleware
+func (siw *ServerInterfaceWrapper) EjectUsb(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EjectUsb(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReleaseUsb operation middleware
+func (siw *ServerInterfaceWrapper) ReleaseUsb(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReleaseUsb(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUsbStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetUsbStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUsbStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1130,6 +1337,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/firewall/status", wrapper.GetFirewallStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/firewall/open", wrapper.OpenFirewallSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/recording/status", wrapper.GetRecordingStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/usb/status", wrapper.GetUsbStatus)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/usb/release", wrapper.ReleaseUsb)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/usb/eject", wrapper.EjectUsb)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/metrics", wrapper.GetMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
@@ -1606,6 +1816,141 @@ func (response GetSystemStatus404JSONResponse) VisitGetSystemStatusResponse(w ht
 	return err
 }
 
+type EjectUsbRequestObject struct {
+	Body *EjectUsbJSONRequestBody
+}
+
+type EjectUsbResponseObject interface {
+	VisitEjectUsbResponse(w http.ResponseWriter) error
+}
+
+type EjectUsb200JSONResponse UsbActionResult
+
+func (response EjectUsb200JSONResponse) VisitEjectUsbResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EjectUsb400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response EjectUsb400JSONResponse) VisitEjectUsbResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EjectUsb404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response EjectUsb404JSONResponse) VisitEjectUsbResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReleaseUsbRequestObject struct {
+	Body *ReleaseUsbJSONRequestBody
+}
+
+type ReleaseUsbResponseObject interface {
+	VisitReleaseUsbResponse(w http.ResponseWriter) error
+}
+
+type ReleaseUsb200JSONResponse UsbActionResult
+
+func (response ReleaseUsb200JSONResponse) VisitReleaseUsbResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReleaseUsb400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ReleaseUsb400JSONResponse) VisitReleaseUsbResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReleaseUsb404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ReleaseUsb404JSONResponse) VisitReleaseUsbResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUsbStatusRequestObject struct {
+}
+
+type GetUsbStatusResponseObject interface {
+	VisitGetUsbStatusResponse(w http.ResponseWriter) error
+}
+
+type GetUsbStatus200JSONResponse UsbStatus
+
+func (response GetUsbStatus200JSONResponse) VisitGetUsbStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUsbStatus404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetUsbStatus404JSONResponse) VisitGetUsbStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// RunClipboardTest 클립보드 카나리아 테스트 (macOS)
@@ -1650,6 +1995,15 @@ type StrictServerInterface interface {
 	// GetSystemStatus 현재 CPU/메모리/디스크/상위 프로세스
 	// (GET /system/status)
 	GetSystemStatus(ctx context.Context, request GetSystemStatusRequestObject) (GetSystemStatusResponseObject, error)
+	// EjectUsb 외장 디스크 꺼내기 (force=true 이면 열린 파일을 무시하고 강제 언마운트)
+	// (POST /usb/eject)
+	EjectUsb(ctx context.Context, request EjectUsbRequestObject) (EjectUsbResponseObject, error)
+	// ReleaseUsb USB 디스크/장치를 점유한 프로세스 종료 (선택 시 이어서 꺼내기)
+	// (POST /usb/release)
+	ReleaseUsb(ctx context.Context, request ReleaseUsbRequestObject) (ReleaseUsbResponseObject, error)
+	// GetUsbStatus USB 장치·외장 디스크와 사용 중인 프로세스
+	// (GET /usb/status)
+	GetUsbStatus(ctx context.Context, request GetUsbStatusRequestObject) (GetUsbStatusResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2039,6 +2393,92 @@ func (sh *strictHandler) GetSystemStatus(w http.ResponseWriter, r *http.Request)
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSystemStatusResponseObject); ok {
 		if err := validResponse.VisitGetSystemStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EjectUsb operation middleware
+func (sh *strictHandler) EjectUsb(w http.ResponseWriter, r *http.Request) {
+	var request EjectUsbRequestObject
+
+	var body EjectUsbJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EjectUsb(ctx, request.(EjectUsbRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EjectUsb")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EjectUsbResponseObject); ok {
+		if err := validResponse.VisitEjectUsbResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReleaseUsb operation middleware
+func (sh *strictHandler) ReleaseUsb(w http.ResponseWriter, r *http.Request) {
+	var request ReleaseUsbRequestObject
+
+	var body ReleaseUsbJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReleaseUsb(ctx, request.(ReleaseUsbRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReleaseUsb")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReleaseUsbResponseObject); ok {
+		if err := validResponse.VisitReleaseUsbResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetUsbStatus operation middleware
+func (sh *strictHandler) GetUsbStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetUsbStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUsbStatus(ctx, request.(GetUsbStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUsbStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetUsbStatusResponseObject); ok {
+		if err := validResponse.VisitGetUsbStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

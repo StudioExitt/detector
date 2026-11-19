@@ -179,6 +179,55 @@ export type RecordingStatus = {
   notes: string[]
 }
 
+export type UsbKind = 'storage' | 'mtp' | 'keyboard' | 'mouse' | 'hid' | 'network' | 'serial' | 'audio' | 'video' | 'other'
+
+export type UsbProc = { pid: number; name: string; user: string; exe: string; files: string[]; count: number; system: boolean }
+
+export type UsbDevice = {
+  id: string
+  name: string
+  vendor: string
+  serial: string
+  vendorId: number
+  productId: number
+  speed: string
+  kinds: UsbKind[]
+  disks: string[]
+  clients: UsbProc[]
+  trusted: boolean
+  known: boolean
+  since: string
+}
+
+export type UsbVolume = { id: string; name: string; mountPoint: string; fs: string; size: number; free: number; readOnly: boolean }
+
+export type UsbDisk = {
+  disk: string
+  deviceId: string
+  name: string
+  bus: string
+  size: number
+  removable: boolean
+  volumes: UsbVolume[]
+  occupants: UsbProc[]
+  readBytes: number
+  writeBytes: number
+  writeBps: number
+  write10m: number
+  statsKnown: boolean
+  trusted: boolean
+}
+
+export type UsbActivity = { at: string; kind: 'connect' | 'disconnect' | 'eject' | 'force_eject' | 'kill' | string; target: string; detail: string; ok: boolean }
+
+export type UsbStatus = { at: string; platform: string; root: boolean; devices: UsbDevice[]; disks: UsbDisk[]; recent: UsbActivity[]; notes: string[] }
+
+export type UsbStep = { action: string; target: string; ok: boolean; detail: string }
+
+export type UsbActionResult = { ok: boolean; steps: UsbStep[] }
+
+export type UsbReleaseRequest = { target: string; pids?: number[]; signal?: 'term' | 'kill'; eject?: boolean }
+
 export type EventList = { items: DetectEvent[]; total: number }
 
 export class ApiError extends Error {
@@ -225,6 +274,9 @@ export const api = {
   firewallStatus: (signal?: AbortSignal) => request<FirewallStatus>('/firewall/status', { signal }),
   openFirewallSettings: () => request<void>('/firewall/open', { method: 'POST' }),
   recordingStatus: (signal?: AbortSignal) => request<RecordingStatus>('/recording/status', { signal }),
+  usbStatus: (signal?: AbortSignal) => request<UsbStatus>('/usb/status', { signal }),
+  usbRelease: (body: UsbReleaseRequest) => request<UsbActionResult>('/usb/release', { method: 'POST', body: JSON.stringify(body) }),
+  usbEject: (disk: string, force = false) => request<UsbActionResult>('/usb/eject', { method: 'POST', body: JSON.stringify({ disk, force }) }),
   metrics: (names: string[], range: MetricRange, signal?: AbortSignal) =>
     request<MetricSeriesList>(`/metrics${query({ names: names.join(','), range })}`, { signal }),
   clipboardTest: () => request<ClipboardTestResult>('/clipboard/test', { method: 'POST' }),

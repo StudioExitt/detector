@@ -173,6 +173,68 @@ paths:
                 $ref: "#/components/schemas/RecordingStatus"
         "404":
           $ref: "#/components/responses/NotFound"
+  /usb/status:
+    get:
+      tags: [system]
+      operationId: getUsbStatus
+      summary: USB 장치·외장 디스크와 사용 중인 프로세스
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsbStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /usb/release:
+    post:
+      tags: [system]
+      operationId: releaseUsb
+      summary: USB 디스크/장치를 점유한 프로세스 종료 (선택 시 이어서 꺼내기)
+      description: |
+        대상(디스크 이름 disk4 / sdb 또는 장치 ID)을 사용 중인 프로세스에 SIGTERM 을 보내고 3초 기다립니다.
+        signal=kill 이면 남은 프로세스에 SIGKILL 을 보냅니다. pids 를 주면 그 중 실제 점유 중인 프로세스만 종료합니다.
+        저장 중인 데이터가 있으면 손실될 수 있습니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsbReleaseRequest"
+      responses:
+        "200":
+          description: 조치 결과 (ok=false 이면 일부 단계 실패)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsbActionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /usb/eject:
+    post:
+      tags: [system]
+      operationId: ejectUsb
+      summary: 외장 디스크 꺼내기 (force=true 이면 열린 파일을 무시하고 강제 언마운트)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsbEjectRequest"
+      responses:
+        "200":
+          description: 조치 결과 (ok=false 이면 일부 단계 실패)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsbActionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /metrics:
     get:
       tags: [system]
@@ -760,6 +822,134 @@ components:
         notes:
           type: array
           items: {type: string}
+    UsbProc:
+      type: object
+      required: [pid, name, user, exe, files, count, system]
+      properties:
+        pid: {type: integer}
+        name: {type: string}
+        user: {type: string}
+        exe: {type: string}
+        files: {type: array, items: {type: string}, description: "열린 경로 예시 (최대 5개)"}
+        count: {type: integer, description: "열린 파일 수"}
+        system: {type: boolean, description: "Spotlight 색인 등 OS 서비스 (대개 무해)"}
+    UsbDevice:
+      type: object
+      required: [id, name, vendor, serial, vendorId, productId, speed, kinds, disks, clients, trusted, known, since]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        vendor: {type: string}
+        serial: {type: string}
+        vendorId: {type: integer}
+        productId: {type: integer}
+        speed: {type: string}
+        kinds:
+          type: array
+          items: {type: string}
+          description: "storage / mtp / keyboard / mouse / hid / network / serial / audio / video / other"
+        disks: {type: array, items: {type: string}}
+        clients:
+          type: array
+          description: USB 장치 자체를 연 프로세스 (MTP 앱, libusb 등)
+          items: {$ref: "#/components/schemas/UsbProc"}
+        trusted: {type: boolean}
+        known: {type: boolean, description: "이전에 연결된 적 있는 장치"}
+        since: {type: string, format: date-time}
+    UsbVolume:
+      type: object
+      required: [id, name, mountPoint, fs, size, free, readOnly]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        mountPoint: {type: string, description: "빈 문자열이면 마운트 안 됨"}
+        fs: {type: string}
+        size: {type: integer, format: int64}
+        free: {type: integer, format: int64}
+        readOnly: {type: boolean}
+    UsbDisk:
+      type: object
+      required: [disk, deviceId, name, bus, size, removable, volumes, occupants, readBytes, writeBytes, writeBps, write10m, statsKnown, trusted]
+      properties:
+        disk: {type: string}
+        deviceId: {type: string}
+        name: {type: string}
+        bus: {type: string}
+        size: {type: integer, format: int64}
+        removable: {type: boolean}
+        volumes:
+          type: array
+          items: {$ref: "#/components/schemas/UsbVolume"}
+        occupants:
+          type: array
+          items: {$ref: "#/components/schemas/UsbProc"}
+        readBytes: {type: integer, format: int64}
+        writeBytes: {type: integer, format: int64}
+        writeBps: {type: number, format: double}
+        write10m: {type: integer, format: int64}
+        statsKnown: {type: boolean}
+        trusted: {type: boolean}
+    UsbActivity:
+      type: object
+      required: [at, kind, target, detail, ok]
+      properties:
+        at: {type: string, format: date-time}
+        kind: {type: string, description: "connect / disconnect / eject / force_eject / kill"}
+        target: {type: string}
+        detail: {type: string}
+        ok: {type: boolean}
+    UsbStatus:
+      type: object
+      required: [at, platform, root, devices, disks, recent, notes]
+      properties:
+        at: {type: string, format: date-time}
+        platform: {type: string}
+        root: {type: boolean}
+        devices:
+          type: array
+          items: {$ref: "#/components/schemas/UsbDevice"}
+        disks:
+          type: array
+          items: {$ref: "#/components/schemas/UsbDisk"}
+        recent:
+          type: array
+          items: {$ref: "#/components/schemas/UsbActivity"}
+        notes:
+          type: array
+          items: {type: string}
+    UsbReleaseRequest:
+      type: object
+      required: [target]
+      properties:
+        target: {type: string, description: "디스크 이름 (disk4 / sdb) 또는 장치 ID (usb-...)"}
+        pids: {type: array, items: {type: integer}, description: "생략하면 점유 중인 모든 프로세스"}
+        signal:
+          type: string
+          enum: [term, kill]
+          description: "term: SIGTERM 만 / kill: SIGTERM 후 남으면 SIGKILL (기본 term)"
+        eject: {type: boolean, description: "종료 후 디스크 꺼내기"}
+    UsbEjectRequest:
+      type: object
+      required: [disk]
+      properties:
+        disk: {type: string}
+        force: {type: boolean, description: "열린 파일을 무시하고 강제 언마운트 (쓰는 중인 데이터 손상 가능)"}
+    UsbStep:
+      type: object
+      required: [action, target, ok, detail]
+      properties:
+        action: {type: string, description: "kill / unmount / force_unmount / eject / hint"}
+        target: {type: string}
+        ok: {type: boolean}
+        detail: {type: string}
+    UsbActionResult:
+      type: object
+      required: [ok, steps]
+      properties:
+        ok: {type: boolean}
+        steps:
+          type: array
+          items: {$ref: "#/components/schemas/UsbStep"}
     MetricPoint:
       type: object
       required: [t, v]

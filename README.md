@@ -37,6 +37,7 @@ make build                           # 빌드만 → build/detector
 | 네트워크 | 인터넷 연결·지연, 게이트웨이·DNS·프록시, 트래픽/지연/외부 연결 차트, 프로세스별 연결, **연결 목록**(연결 수 타일·프로세스 행 클릭 → 범위/상태/검색 필터), 네트워크 이벤트 |
 | 방화벽 | 방화벽 동작 여부, 구성요소별 설정·허용/차단 규칙·설정 파일, 방화벽 변경 이벤트 |
 | 녹화 감시 | 화면·마이크·카메라 사용 여부와 사용 중인 앱, 장치 상태, 녹화·원격 도구, 녹화 권한(허용 앱), 최근 사용 기록, 녹화 감시 이벤트 |
+| USB 감시 | 외장 디스크별 볼륨·쓰기량·**사용 중인 프로세스**와 **꺼내기 / 점유 종료 후 꺼내기 / 강제 꺼내기**, 프로세스별 종료·강제 종료, USB 장치 목록(종류·VID:PID·시리얼·장치를 연 프로세스), 연결·해제·조치 기록, USB 이벤트 |
 | 취약점 점검 | 취약한 보안 설정 등 취약점 이벤트 |
 | 전체 이벤트 | 모든 이벤트 |
 | 탐지기 상태 | 탐지기별 동작 상태 → 클릭하면 상세 (현재 점검 항목 · 실행 이력 · 탐지 이벤트), 클립보드 카나리아 테스트 |
@@ -134,6 +135,7 @@ detector/
 | `resources` 시스템 자원 | 프로세스 CPU 장기 점유(채굴 의심), 시스템 CPU 과부하, 메모리 압박, 메모리 과점유, 디스크 부족·급증 | top, vm_stat, sysctl, ps, statfs | `/proc`, PSI, statfs |
 | `network` 네트워크 | 의심 포트(백도어·IRC·Tor·채굴 풀) 연결, 임시 경로/서명 없는 프로그램의 외부 통신, 대량 연결·다수 호스트·아웃바운드 스캔, 대용량 업로드(macOS), DNS·프록시·게이트웨이 MAC 변경, 인터넷 끊김 | route, arp, scutil, netstat, codesign | `/proc/net/*`, resolv.conf |
 | `recording` 녹화 감시 | 화면 녹화/캡처·마이크 녹음·카메라 촬영 시작, 앱을 확인할 수 없는 캡처, 녹화·원격 화면 도구 실행, 녹화 권한 새로 허용 | ControlCenter 표시등 로그(`log stream`), CoreAudio, CoreMediaIO, TCC.db, ps | ALSA(`/proc/asound`), pactl, `/dev/video*` 를 연 프로세스, `/proc` |
+| `usb` USB 감시 | USB 저장장치·휴대폰(MTP) 연결, 처음 보는 장치, 처음 보는 키보드(BadUSB), 외장 디스크 대량 쓰기(유출 의심), 사용자 조치 기록 | ioreg(IOUSBHostDevice), diskutil, lsof | sysfs(`/sys/bus/usb`, `/sys/block`), mountinfo, `/proc/<pid>/fd` |
 | `clipboard` 클립보드 (macOS) | 지갑 주소 바꿔치기(클리퍼) | NSPasteboard | — |
 | `extensions` 브라우저 확장 (macOS) | 악성 확장 (Chrome 계열 + Firefox) | 프로필별 Secure Preferences, manifest, JS 코드, 강제 설치 정책 | — |
 
@@ -152,6 +154,7 @@ detector/
 | resources | `res.cpu_hog`, `res.cpu_high`, `res.mem_pressure`, `res.mem_hog`, `res.disk_full`, `res.disk_growth` |
 | network | `net.suspicious_port`, `net.suspicious_process`, `net.unsigned_process`, `net.conn_flood`, `net.many_hosts`, `net.outbound_scan`, `net.large_upload`, `net.dns_changed`, `net.proxy_set`, `net.proxy_changed`, `net.gateway_mac_changed`, `net.offline` |
 | recording | `rec.screen_active`, `rec.mic_active`, `rec.camera_active`, `rec.unattributed_capture`, `rec.tool_running`, `rec.permission_granted` |
+| usb | `usb.storage_connected`, `usb.mtp_connected`, `usb.new_device`, `usb.new_keyboard`, `usb.bulk_write`, `usb.action` |
 | clipboard | `clipboard.address_swapped`, `clipboard.rapid_rewrite`, `clipboard.canary_swapped` |
 | extensions | `browser.ext_risky`, `browser.ext_new`, `browser.ext_perm_escalation`, `browser.ext_new_verdict`, `browser.ext_blocklisted`, `browser.ext_policy_install`, `browser.ext_sideload` |
 
@@ -163,6 +166,24 @@ detector/
 - **Linux**: ufw, firewalld, nftables, iptables 상태·기본 정책·규칙 (규칙 조회는 대부분 root 필요)
 - 주의 표시: 스크립트 인터프리터(python3, ruby, node …)의 수신 허용 — 어떤 스크립트든 포트를 열 수 있음, 임시 경로 프로그램, 삭제된 앱의 남은 규칙
 - 화면의 현재 상태는 조회할 때마다 새로 수집하고, 탐지기는 `interval`(기본 1분)마다 변경을 감시합니다. 방화벽이 꺼져 있다는 사실 자체는 `posture` 탐지기가 한 번 보고합니다.
+
+### USB 감시 (`[detect.usb]`)
+
+- **장치**: 연결된 USB 장치의 제품·제조사·시리얼·VID:PID 와 종류(저장장치, 휴대폰·카메라(MTP/PTP), 키보드, 마우스, 네트워크, 시리얼 …). 장치를 직접 연 프로세스(MTP 앱, WebUSB 를 쓰는 브라우저 등)도 표시합니다 — macOS 는 IORegistry 의 `IOUserClientCreator`, Linux 는 `/dev/bus/usb/BBB/DDD` 를 연 프로세스.
+- **외장 디스크**: 볼륨·마운트 위치·파일시스템·사용량, USB 연결이면 연결 후 읽기/쓰기 바이트와 **최근 10분 쓰기량**. 디스크 이미지(.dmg)는 제외합니다.
+- **누가 사용 중인지**: 마운트된 볼륨이나 `/dev/diskN`·`/dev/rdiskN`(Linux `/dev/sdX`)에 파일을 열어 두었거나 현재 디렉터리로 쓰는 프로세스. Spotlight(`mds`, `mdworker`), `fseventsd`, udisks 등 OS 서비스는 "시스템" 으로 구분합니다. **root 가 아니면 다른 사용자·시스템 프로세스는 보이지 않습니다.**
+- **조치** (웹 화면의 버튼, 실행 전 확인 창):
+  | 버튼 | 동작 |
+  |---|---|
+  | 꺼내기 | `diskutil eject` (Linux: `udisksctl unmount` + `power-off`, 없으면 `umount` + `eject`). 사용 중이면 실패하고 사용 중인 프로세스를 알려줌 |
+  | 점유 종료 후 꺼내기 | 사용 중인 프로세스에 SIGTERM → 3초 후 남은 프로세스에 SIGKILL → 꺼내기 |
+  | 강제 꺼내기 | `diskutil unmountDisk force` (Linux: `umount -f`, 실패 시 `umount -l`) 후 꺼내기. 프로세스는 그대로 두고 열린 파일을 무시 — **쓰는 중인 데이터가 손상될 수 있음** |
+  | 종료 / 강제 종료 (프로세스별) | SIGTERM / SIGTERM 후 SIGKILL |
+  | 모두 종료 (USB 장치) | 장치를 연 프로세스를 모두 종료 (예: 휴대폰을 붙잡고 있는 MTP 앱) |
+  - `launchd`, `kernel_task`, `WindowServer`, `loginwindow`, `systemd`, detector 자신은 종료하지 않습니다. 대상이 실제로 그 장치를 사용 중인지 조치 직전에 다시 확인합니다.
+  - 모든 조치는 `usb.action` 이벤트와 최근 기록에 남습니다.
+- **이벤트**: 저장장치 연결(`usb.storage_connected`, 처음 보는 장치면 medium), 휴대폰·카메라 연결(`usb.mtp_connected`), 처음 보는 장치(`usb.new_device`), **처음 보는 키보드**(`usb.new_keyboard`, high — 키 입력을 주입하는 BadUSB 의심), **대량 쓰기**(`usb.bulk_write`, high — 10분간 `writeMB` 이상). 첫 실행 때 연결되어 있던 장치는 기준선으로 저장하고 보고하지 않습니다.
+- 늘 쓰는 장치는 `trustedDevices` 에 시리얼·`"vid:pid"`·제품 이름을 넣으면 이벤트에서 제외됩니다.
 
 ### 화면 녹화·녹음·촬영 감시 (`[detect.recording]`)
 
@@ -223,6 +244,9 @@ Swagger UI: `http://localhost:<apiPort>/swagger/` — 스펙은 `api/openapi.yam
 | GET | `/api/v1/firewall/status` | 방화벽 동작 여부와 설정 내역 (조회 시점에 수집) |
 | POST | `/api/v1/firewall/open` | 시스템 설정 → 네트워크 → 방화벽 열기 (macOS, 서버가 실행 중인 Mac 에서 열림) |
 | GET | `/api/v1/recording/status` | 화면·마이크·카메라 사용 현황, 장치, 녹화·원격 도구, 녹화 권한, 최근 사용 기록 |
+| GET | `/api/v1/usb/status` | USB 장치, 외장 디스크·볼륨·쓰기량, 사용 중인 프로세스, 연결·조치 기록 |
+| POST | `/api/v1/usb/release` | 디스크/장치를 점유한 프로세스 종료 `{"target":"disk4","signal":"term\|kill","pids":[..],"eject":true}` |
+| POST | `/api/v1/usb/eject` | 디스크 꺼내기 `{"disk":"disk4","force":false}` (`force` = 열린 파일 무시하고 강제 언마운트) |
 | GET | `/api/v1/metrics` | 시계열 지표 (`names=cpu.usage,mem.used_pct,...`, `range=1h\|6h\|24h\|7d`) |
 
 시계열 지표 이름: `cpu.usage`, `cpu.load1`, `mem.used_pct`, `mem.swap_used`, `disk.used_pct`, `net.rx_bps`, `net.tx_bps`, `net.established`, `net.external`, `net.latency_ms`
@@ -267,5 +291,6 @@ make dev-web    # 터미널 2: Vite 개발 서버 (핫 리로드) → http://loc
 | `make dev-web` 화면에서 API 오류 (500) | `VITE_PROXY_TARGET` 포트가 `apiPort` 와 다름 → `web/.env.development` 수정 후 개발 서버 재시작 |
 | 탐지 기록/기준선이 사라짐 | 루트가 아닌 곳에서 실행해 새 DB 가 생김 → 루트에서 실행 |
 | 녹화 감시 "TCC.db 읽기 불가" | 전체 디스크 접근 권한 필요 → 시스템 설정 → 개인정보 보호 및 보안 → 전체 디스크 접근 권한에 detector(또는 실행한 터미널) 추가 후 재시작 |
+| USB 감시에서 점유 프로세스가 안 보이거나 "권한 없음" 으로 종료 실패 | 다른 사용자·시스템 프로세스는 root 필요 → `sudo ./build/detector -c config.toml` |
 | 클립보드 탐지기 경고 "root 로 실행 중" | 클립보드는 로그인 사용자 세션에 속함 → 사용자 권한으로 실행 |
 | 일부 파일이 "읽기 불가" | 권한 부족 → root 로 실행하면 내용까지 비교 |
